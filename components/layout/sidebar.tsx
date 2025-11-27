@@ -1,4 +1,5 @@
 // components/layout/sidebar.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -23,7 +24,7 @@ import {
   BarChart,
   Settings,
 } from "lucide-react";
-import { getInitials } from "@/lib/utils"; // We'll modify utils for this
+import { getInitials } from "@/lib/utils"; 
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,8 +47,10 @@ export function Sidebar({ user }: SidebarProps) {
       <SidebarHeader>
         <Logo />
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarMenu>
+      
+      {/* MODIFICATION: Added mt-8 to create space below the logo */}
+      <SidebarContent className="mt-8">
+        <SidebarMenu className="gap-y-2">
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
@@ -64,6 +67,7 @@ export function Sidebar({ user }: SidebarProps) {
           ))}
         </SidebarMenu>
       </SidebarContent>
+
       <SidebarFooter>
         <div className="flex items-center gap-3 p-2">
           <Avatar className="h-9 w-9">

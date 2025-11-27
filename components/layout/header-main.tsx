@@ -1,18 +1,11 @@
 // components/layout/header-main.tsx
+
 "use client";
 
 import Link from "next/link";
 import { User } from "next-auth";
 import { signOut } from "next-auth/react";
 import { Search, LogOut, Settings } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,17 +26,12 @@ interface HeaderMainProps {
 
 export function HeaderMain({ user }: HeaderMainProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-      <SidebarTrigger className="sm:hidden" />
-      <Breadcrumb className="hidden md:flex">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard">Dashboard</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="sm:hidden" /> {/* For mobile */}
+        <SidebarTrigger className="hidden sm:flex" /> {/* For desktop */}
+      </div>
+
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
