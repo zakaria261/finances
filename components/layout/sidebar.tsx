@@ -29,8 +29,8 @@ import { getInitials } from "@/lib/utils";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Wallet },
-  { href: "/budgets", label: "Budgets", icon: Landmark },
-  { href: "/goals", label: "Goals", icon: Target },
+  { href: "/budgets", label: "Budgets", icon: Landmark }, // This is already here
+  { href: "/goals", label: "Goals", icon: Target },     // This is already here
   { href: "/investments", label: "Investments", icon: BarChart },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
