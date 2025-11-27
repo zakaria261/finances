@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signIn } from "next-auth/react";
 import { Wallet, LogIn, Mail, Lock } from "lucide-react";
-import Image from "next/image";
+import { FaGoogle } from "react-icons/fa"; // MODIFICATION: Import the icon
 
 import { Button } from "@/components/ui/button";
 import {
@@ -93,8 +93,9 @@ export default function LoginPage() {
           className="w-full"
           onClick={handleGoogleSignIn}
         >
-          <Image src="/google.svg" alt="Google" width={20} height={20} className="mr-2"/>
-          Continue with Google
+          {/* MODIFICATION: Replaced Image with React Icon */}
+          <FaGoogle className="mr-2 h-4 w-4" />
+          Sign in with Google
         </Button>
 
         <div className="relative my-6">

@@ -136,3 +136,21 @@
 .animate-appear {
   animation: appear 0.5s ease-out forwards;
 }
+
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #4f46e5, #be185d, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
+}

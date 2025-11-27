@@ -10,7 +10,7 @@ import * as z from "zod";
 import { signIn } from "next-auth/react";
 import axios from "axios";
 import { Wallet, UserPlus, Mail, Lock } from "lucide-react";
-import Image from "next/image";
+import { FaGoogle } from "react-icons/fa"; // MODIFICATION: Import the icon
 
 import { Button } from "@/components/ui/button";
 import {
@@ -105,8 +105,9 @@ export default function RegisterPage() {
           className="w-full"
           onClick={handleGoogleSignIn}
         >
-           <Image src="/google.svg" alt="Google" width={20} height={20} className="mr-2"/>
-          Continue with Google
+          {/* MODIFICATION: Replaced Image with React Icon */}
+          <FaGoogle className="mr-2 h-4 w-4" />
+          Sign up with Google
         </Button>
 
         <div className="relative my-6">
