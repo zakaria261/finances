@@ -104,8 +104,1048 @@ PROJECT CODE FILES
 ================================================================================
 
 // ============================================================================
+// FILE: app/(auth)/layout.tsx
+// ============================================================================
+
+// app/(auth)/layout.tsx
+
+import Link from "next/link";
+import { Wallet } from "lucide-react";
+
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen">
+      <div className="flex flex-1 flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+        <div className="mx-auto w-full max-w-sm lg:w-96">
+            {children}
+        </div>
+      </div>
+      
+      {/* MODIFICATION: Removed the <Image> component and added the animated-gradient class */}
+      <div className="relative hidden w-0 flex-1 lg:block animated-gradient">
+        {/* The overlay is kept to ensure text is readable over the moving gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent flex flex-col justify-end p-12">
+            <Link href="/" className="flex items-center space-x-2 mb-4">
+                <Wallet className="h-8 w-8 text-white" />
+                <span className="text-2xl font-bold text-white">Finances Expert Pro</span>
+            </Link>
+            <h2 className="text-3xl font-bold tracking-tight text-white">
+                Take control of your financial future.
+            </h2>
+            <p className="mt-4 text-lg text-white/80">
+                Join thousands of users who are building wealth and achieving their goals with our powerful tools.
+            </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(auth)/login/page.tsx
+// ============================================================================
+
+// app/(auth)/login/page.tsx
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { signIn } from "next-auth/react";
+import { Wallet, LogIn, Mail, Lock } from "lucide-react";
+import { FaGoogle } from "react-icons/fa"; // MODIFICATION: Import the icon
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email." }),
+  password: z.string().min(1, { message: "Password is required." }),
+});
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await signIn("credentials", {
+        ...values,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password. Please try again.");
+      } else if (result?.ok) {
+        router.push("/dashboard"); // Redirect to a protected page
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    signIn("google", { callbackUrl: "/dashboard" });
+  };
+
+  return (
+    <div>
+      <div>
+        <div className="flex items-center gap-2">
+            <Wallet className="h-8 w-8 text-primary" />
+            <h2 className="mt-2 text-2xl font-bold leading-9 tracking-tight text-foreground">
+                Sign in to your account
+            </h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-primary hover:text-primary/90"
+          >
+            Sign up
+          </Link>
+        </p>
+      </div>
+
+      <div className="mt-10">
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignIn}
+        >
+          {/* MODIFICATION: Replaced Image with React Icon */}
+          <FaGoogle className="mr-2 h-4 w-4" />
+          Sign in with Google
+        </Button>
+
+        <div className="relative my-6">
+            <Separator />
+            <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email address</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                      <Input placeholder="you@example.com" {...field} className="pl-10"/>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                     <div className="relative">
+                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                       <Input type="password" placeholder="••••••••" {...field} className="pl-10"/>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Signing in..." : <> <LogIn className="mr-2 h-4 w-4"/> Sign in</>}
+            </Button>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(auth)/register/page.tsx
+// ============================================================================
+
+// app/(auth)/register/page.tsx
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { signIn } from "next-auth/react";
+import axios from "axios";
+import { Wallet, UserPlus, Mail, Lock } from "lucide-react";
+import { FaGoogle } from "react-icons/fa"; // MODIFICATION: Import the icon
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+
+const formSchema = z.object({
+  name: z.string().min(1, { message: "Name is required." }),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await axios.post("/api/register", values);
+      
+      const result = await signIn("credentials", {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Failed to sign in after registration. Please log in manually.");
+      } else if (result?.ok) {
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+        if (err.response?.status === 409) {
+            setError("An account with this email already exists.");
+        } else {
+            setError("An unexpected error occurred. Please try again.");
+        }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleGoogleSignIn = () => {
+    signIn("google", { callbackUrl: "/dashboard" });
+  };
+
+
+  return (
+    <div>
+       <div>
+        <div className="flex items-center gap-2">
+            <Wallet className="h-8 w-8 text-primary" />
+            <h2 className="mt-2 text-2xl font-bold leading-9 tracking-tight text-foreground">
+                Create your account
+            </h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-primary hover:text-primary/90"
+          >
+            Sign in
+          </Link>
+        </p>
+      </div>
+
+      <div className="mt-10">
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignIn}
+        >
+          {/* MODIFICATION: Replaced Image with React Icon */}
+          <FaGoogle className="mr-2 h-4 w-4" />
+          Sign up with Google
+        </Button>
+
+        <div className="relative my-6">
+            <Separator />
+            <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+             <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                      <Input placeholder="John Doe" {...field} className="pl-10"/>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email address</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                      <Input placeholder="you@example.com" {...field} className="pl-10"/>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                     <div className="relative">
+                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                       <Input type="password" placeholder="••••••••" {...field} className="pl-10"/>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isLoading}>
+                 {isLoading ? "Creating account..." : <> <UserPlus className="mr-2 h-4 w-4"/> Sign up</>}
+            </Button>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/budgets/page.tsx
+// ============================================================================
+
+// app/(main)/budgets/page.tsx (NEW FILE)
+import { getBudgetsWithSpending } from "@/lib/actions/budget.actions";
+import { AddBudgetDialog } from "@/components/budgets/add-budget-dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { formatCurrency } from "@/lib/utils";
+
+export default async function BudgetsPage() {
+  const budgets = await getBudgetsWithSpending();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">Budgets</h1>
+        <AddBudgetDialog />
+      </div>
+
+      {budgets.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {budgets.map((budget) => (
+            <Card key={budget.id}>
+              <CardHeader>
+                <CardTitle>{budget.category}</CardTitle>
+                <CardDescription>Monthly Spending Limit: {formatCurrency(budget.limit)}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="font-semibold">{formatCurrency(budget.spent)} spent</div>
+                  <Progress value={budget.progress} className={budget.progress > 100 ? "[&>div]:bg-red-500" : ""}/>
+                </div>
+              </CardContent>
+              <CardFooter>
+                 <p className={`text-sm font-medium ${budget.remaining < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {budget.remaining >= 0 ? `${formatCurrency(budget.remaining)} remaining` : `${formatCurrency(Math.abs(budget.remaining))} over budget`}
+                 </p>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card className="flex flex-col items-center justify-center p-8">
+            <CardTitle>No Budgets Found</CardTitle>
+            <CardDescription className="mt-2">Create a budget to start tracking your spending.</CardDescription>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/dashboard/page.tsx
+// ============================================================================
+
+// app/(main)/dashboard/page.tsx
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DollarSign, Landmark, PiggyBank, Scale } from "lucide-react";
+import { getTransactions } from "@/lib/actions/transaction.actions";
+import { formatCurrency } from "@/lib/utils";
+import {
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  format,
+  startOfYear,
+} from "date-fns";
+import { MonthlySummaryChart } from "@/components/dashboard/monthly-summary-chart";
+import { ExpenseByCategoryChart } from "@/components/dashboard/expense-by-category-chart";
+
+export default async function DashboardPage() {
+  const transactions = await getTransactions();
+
+  // --- Data for Stat Cards ---
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+
+  const monthlyTransactions = transactions.filter(
+    (t) => t.date >= monthStart && t.date <= monthEnd
+  );
+
+  const monthlyIncome = monthlyTransactions
+    .filter((t) => t.type === "INCOME")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const monthlyExpense = monthlyTransactions
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const cashFlow = monthlyIncome - monthlyExpense;
+
+  const totalFlow = transactions.reduce(
+    (sum, t) => sum + (t.type === "INCOME" ? t.amount : -t.amount),
+    0
+  );
+
+  // --- Data for Monthly Summary Bar Chart (Last 6 Months) ---
+  const monthlySummaryData = Array.from({ length: 6 }).map((_, i) => {
+    const date = subMonths(now, 5 - i);
+    const monthStart = startOfMonth(date);
+    const monthEnd = endOfMonth(date);
+
+    const monthTransactions = transactions.filter(
+      (t) => t.date >= monthStart && t.date <= monthEnd
+    );
+
+    const income = monthTransactions
+      .filter((t) => t.type === "INCOME")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const expense = monthTransactions
+      .filter((t) => t.type === "EXPENSE")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      month: format(date, "MMM"),
+      income,
+      expense,
+    };
+  });
+  
+  // --- Data for Expense by Category Donut Chart (Current Month) ---
+  const expenseByCategory = monthlyTransactions
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>);
+  
+  const chartColors = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+  ];
+
+  const expenseByCategoryData = Object.entries(expenseByCategory)
+    .map(([category, amount], index) => ({
+      category,
+      amount,
+      fill: chartColors[index % chartColors.length],
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="text-2xl font-semibold leading-none tracking-tight">
+        Welcome Back!
+      </h1>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Stat Cards remain the same */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Flow</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(totalFlow)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total income minus total expense
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Monthly Cash Flow
+            </CardTitle>
+            <Scale className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+             <div className={`text-2xl font-bold ${cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+               {formatCurrency(cashFlow)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This month&apos;s income vs. expenses
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Financial Health
+            </CardTitle>
+            <PiggyBank className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">82/100</div>
+            <p className="text-xs text-muted-foreground">
+              Based on AI analysis
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Active Budgets
+            </CardTitle>
+            <Landmark className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">5</div>
+            <p className="text-xs text-muted-foreground">
+              3 on track, 2 overspending
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Chart Section */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Summary</CardTitle>
+            <CardDescription>
+              Income vs. Expense for the last 6 months.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MonthlySummaryChart data={monthlySummaryData} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Expense Breakdown</CardTitle>
+            <CardDescription>
+              How your expenses are categorized this month.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExpenseByCategoryChart data={expenseByCategoryData} />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/goals/page.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: app/(main)/goals/page.tsx
+// ============================================================================
+
+import { getGoals } from "@/lib/actions/goal.actions";
+import { AddGoalDialog } from "@/components/goals/add-goal-dialog";
+import { GoalCard } from "@/components/goals/goal-card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default async function GoalsPage() {
+  const goals = await getGoals();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          Financial Goals
+        </h1>
+        <AddGoalDialog />
+      </div>
+
+      {goals.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {goals.map((goal) => (
+            <GoalCard key={goal.id} goal={goal} />
+          ))}
+        </div>
+      ) : (
+        <Card className="flex flex-col items-center justify-center p-8 text-center">
+          <CardHeader>
+            <CardTitle>No Goals Yet</CardTitle>
+            <CardDescription>
+              Setting goals is the first step to financial freedom. Create your first goal today!
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/investments/page.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: app/(main)/investments/page.tsx
+// ============================================================================
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { InvestmentsTable } from "@/components/investments/investment-table";
+import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
+import { getInvestments } from "@/lib/actions/investment.actions";
+
+export default async function InvestmentsPage() {
+  const investments = await getInvestments();
+  
+  const totalValue = investments.reduce((sum, inv) => sum + (inv.quantity * inv.purchasePrice), 0);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">Portfolio</h1>
+        <AddInvestmentDialog />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+           <CardHeader className="pb-2">
+             <CardTitle className="text-sm font-medium">Total Portfolio Value</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalValue)}</div>
+           </CardContent>
+        </Card>
+        <Card>
+           <CardHeader className="pb-2">
+             <CardTitle className="text-sm font-medium">Total Holdings</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <div className="text-2xl font-bold">{investments.length}</div>
+           </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Investments</CardTitle>
+          <CardDescription>Track your stocks, crypto, and assets.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {investments.length > 0 ? (
+                <InvestmentsTable investments={investments} />
+            ) : (
+                <p className="text-muted-foreground text-sm">No investments tracked yet.</p>
+            )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/layout.tsx
+// ============================================================================
+
+// app/(main)/layout.tsx
+
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar"; // MODIFICATION: Import SidebarRail
+import { Sidebar } from "@/components/layout/sidebar";
+import { HeaderMain } from "@/components/layout/header-main";
+
+export default async function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  return (
+    // MODIFICATION: Added collapsible="icon" to enable the interactive collapse feature
+    <SidebarProvider collapsible="icon"> 
+      <div className="flex min-h-screen w-full"> {/* MODIFICATION: Added w-full */}
+        <Sidebar user={session.user} />
+        <SidebarRail /> {/* MODIFICATION: Added the rail component */}
+        <SidebarInset>
+          <HeaderMain user={session.user} />
+          <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/settings/page.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: app/(main)/settings/page.tsx
+// ============================================================================
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
+
+export default async function SettingsPage() {
+  const session = await getServerSession(authOptions);
+  const user = session?.user;
+
+  return (
+    <div className="flex flex-col gap-6 max-w-4xl">
+       <h1 className="text-2xl font-semibold leading-none tracking-tight">Settings</h1>
+       
+       <Card>
+         <CardHeader>
+           <CardTitle>Profile</CardTitle>
+           <CardDescription>Manage your public profile information.</CardDescription>
+         </CardHeader>
+         <CardContent className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Avatar className="h-20 w-20">
+                    <AvatarImage src={user?.image || undefined} />
+                    <AvatarFallback className="text-lg">{getInitials(user?.name)}</AvatarFallback>
+                </Avatar>
+                <Button variant="outline">Change Avatar</Button>
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" defaultValue={user?.name || ""} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" defaultValue={user?.email || ""} disabled className="bg-muted"/>
+                </div>
+            </div>
+            
+            <div className="flex justify-end">
+                <Button>Save Changes</Button>
+            </div>
+         </CardContent>
+       </Card>
+
+       <Card>
+         <CardHeader>
+           <CardTitle>Preferences</CardTitle>
+           <CardDescription>Customize your application experience.</CardDescription>
+         </CardHeader>
+         <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                    <Label className="text-base">Marketing Emails</Label>
+                    <p className="text-sm text-muted-foreground">Receive emails about new features and tips.</p>
+                </div>
+                <Button variant="outline" size="sm">Enabled</Button>
+            </div>
+             <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                    <Label className="text-base">Currency</Label>
+                    <p className="text-sm text-muted-foreground">Select your preferred currency for display.</p>
+                </div>
+                <Button variant="outline" size="sm">USD ($)</Button>
+            </div>
+         </CardContent>
+       </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/transactions/page.tsx
+// ============================================================================
+
+// app/(main)/transactions/page.tsx
+
+import { getTransactions } from "@/lib/actions/transaction.actions";
+import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
+import { TransactionsTable } from "@/components/transactions/transactions-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default async function TransactionsPage() {
+  const transactions = await getTransactions();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          Transactions
+        </h1>
+        <AddTransactionDialog />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Transaction History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transactions.length > 0 ? (
+            <TransactionsTable transactions={transactions} />
+          ) : (
+            <p className="text-muted-foreground">No transactions found. Add one to get started!</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/api/auth/[...nextauth]/route.ts
+// ============================================================================
+
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth, { AuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+
+export const authOptions: AuthOptions = {
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    }),
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Invalid credentials");
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+
+        if (!user || !user.password) {
+          throw new Error("Invalid credentials");
+        }
+
+        const isPasswordCorrect = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isPasswordCorrect) {
+          throw new Error("Invalid credentials");
+        }
+
+        return user;
+      },
+    }),
+  ],
+  pages: {
+    signIn: "/login",
+  },
+  session: {
+    strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+      }
+      return session;
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };
+
+// ============================================================================
+// FILE: app/api/register/route.ts
+// ============================================================================
+
+// app/api/register/route.ts
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import prisma from "@/lib/prisma";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { name, email, password } = body;
+
+    if (!name || !email || !password) {
+      return new NextResponse("Missing fields", { status: 400 });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return new NextResponse("Email already in use", { status: 409 });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+      },
+    });
+
+    return NextResponse.json(user);
+  } catch (error) {
+    console.error("REGISTRATION_ERROR", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
+  }
+}
+
+// ============================================================================
 // FILE: app/globals.css
 // ============================================================================
+
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -230,14 +1270,50 @@ PROJECT CODE FILES
   }
 }
 
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-appear {
+  animation: appear 0.5s ease-out forwards;
+}
+
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #4f46e5, #be185d, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
+}
 
 // ============================================================================
 // FILE: app/layout.tsx
 // ============================================================================
 
+// app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Instrument_Sans, Lora } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/providers";
+import { Toaster } from "@/components/ui/toaster"; // MODIFICATION: Import Toaster
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -249,9 +1325,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const instrumentSans = Instrument_Sans({
+  variable: "--font-instrument-sans",
+  subsets: ["latin"],
+});
+
+const lora = Lora({
+  variable: "--font-logo",
+  subsets: ["latin"],
+  weight: "600",
+});
+
 export const metadata: Metadata = {
-  title: "Create Next App",
-  description: "Generated by create next app",
+  title: "Finances Expert Pro",
+  description: "The Smart Way to Manage Your Personal Finances",
 };
 
 export default function RootLayout({
@@ -260,87 +1347,79 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${instrumentSans.variable} ${lora.variable} antialiased`}
       >
-        {children}
+        <Providers
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster /> {/* MODIFICATION: Add Toaster here */}
+        </Providers>
       </body>
     </html>
   );
 }
 
-
 // ============================================================================
 // FILE: app/page.tsx
 // ============================================================================
 
-import Image from "next/image";
+// app/page.tsx
+import { Header } from "@/components/layout/header";
+import { Hero } from "@/components/landing/hero";
+import { Features } from "@/components/landing/features";
+import { Pricing } from "@/components/landing/pricing";
+import { Footer } from "@/components/layout/footer";
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <main className="flex-1 pt-14">
+        <Hero
+          eyebrow="FINANCES EXPERT PRO"
+          title={
+            <>
+              The Smart Way to Manage <br /> Your Personal Finances
+            </>
+          }
+          subtitle="From daily transaction tracking to long-term investment planning, our AI-powered platform gives you the clarity and control you need to achieve your financial goals."
+          ctaText="Get Started for Free"
+          ctaLink="/register"
+          mockupImage={{
+            src: "/dashboard-mockup.png", // NOTE: Add a placeholder image to your `public` folder
+            alt: "Finances Expert Pro Dashboard Mockup",
+            width: 1440,
+            height: 900,
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        <Features />
+        <Pricing />
+
+        {/* About section */}
+        <section id="about" className="w-full py-24 sm:py-32">
+          <div className="container">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold">About Finances Expert Pro</h2>
+              <p className="text-muted-foreground mt-4 max-w-3xl mx-auto">
+                This application provides users with a comprehensive and
+                intelligent platform to manage every aspect of their financial
+                lives, from daily transaction tracking to long-term investment
+                and goal planning.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
+      <Footer />
     </div>
   );
 }
-
 
 // ============================================================================
 // FILE: components.json
@@ -369,6 +1448,1872 @@ export default function Home() {
   "registries": {}
 }
 
+
+// ============================================================================
+// FILE: components/budgets/add-budget-dialog.tsx
+// ============================================================================
+
+// components/budgets/add-budget-dialog.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PlusCircle } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { createBudget } from "@/lib/actions/budget.actions";
+
+const formSchema = z.object({
+  category: z.string().min(1, "Category is required."),
+  limit: z.coerce.number().positive("Limit must be a positive number."),
+});
+
+const expenseCategories = ["Food", "Transport", "Housing", "Entertainment", "Utilities", "Other"];
+
+export function AddBudgetDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const result = await createBudget(values);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Budget</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Create a New Budget</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="category" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {expenseCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="limit" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Monthly Limit</FormLabel>
+                <FormControl><Input type="number" placeholder="500.00" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Creating..." : "Create Budget"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/dashboard/ai-insights-card.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: components/dashboard/ai-insights-card.tsx
+// ============================================================================
+
+"use client";
+
+import { useState } from "react";
+import { Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { generateFinancialInsights } from "@/lib/actions/ai.actions";
+
+export function AiInsightsCard() {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<{score: number; summary: string; recommendations: string[]} | null>(null);
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    try {
+      const result = await generateFinancialInsights();
+      setData(result);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-indigo-500/20 bg-indigo-50/10 dark:bg-indigo-950/10">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+           <Sparkles className="h-5 w-5 text-indigo-500" />
+           <CardTitle>AI Financial Analyst</CardTitle>
+        </div>
+        <CardDescription>Get personalized insights powered by Gemini.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            <p className="text-sm text-muted-foreground">Analyzing your transactions...</p>
+          </div>
+        ) : data ? (
+          <div className="space-y-4">
+             <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border">
+                <span className="text-sm font-medium">Financial Health Score</span>
+                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score}/100</span>
+             </div>
+             <p className="text-sm">{data.summary}</p>
+             <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Recommendations</p>
+                <ul className="text-sm space-y-1 list-disc pl-4">
+                    {data.recommendations.map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                    ))}
+                </ul>
+             </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-sm text-muted-foreground">
+            Tap the button below to generate a real-time analysis of your finances.
+          </div>
+        )}
+      </CardContent>
+      <CardFooter>
+        <Button 
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" 
+            onClick={handleGenerate} 
+            disabled={loading}
+        >
+            {data ? <><RefreshCw className="mr-2 h-4 w-4"/> Refresh Analysis</> : "Generate Insights"}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+// ============================================================================
+// FILE: components/dashboard/expense-by-category-chart.tsx
+// ============================================================================
+
+// components/dashboard/expense-by-category-chart.tsx (NEW FILE)
+
+"use client";
+
+import * as React from "react";
+import { Pie, PieChart, ResponsiveContainer, Cell } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { formatCurrency } from "@/lib/utils";
+
+interface ExpenseByCategoryChartProps {
+  data: {
+    category: string;
+    amount: number;
+    fill: string;
+  }[];
+}
+
+export function ExpenseByCategoryChart({ data }: ExpenseByCategoryChartProps) {
+  const chartConfig = React.useMemo(() => {
+    return data.reduce((config, item) => {
+      config[item.category] = { label: item.category, color: item.fill };
+      return config;
+    }, {} as ChartConfig);
+  }, [data]);
+
+  if (data.length === 0) {
+    return (
+       <div className="h-96 flex items-center justify-center">
+          <p className="text-muted-foreground">No expenses recorded for this month.</p>
+       </div>
+    )
+  }
+
+
+  const totalAmount = React.useMemo(() => {
+    return data.reduce((acc, curr) => acc + curr.amount, 0);
+  }, [data]);
+
+  return (
+    <ChartContainer
+      config={chartConfig}
+      className="min-h-[300px] w-full"
+    >
+      <ResponsiveContainer>
+        <PieChart>
+          <ChartTooltip
+            cursor={false}
+            content={<ChartTooltipContent hideLabel formatter={(value) => formatCurrency(value as number)}/>}
+          />
+          <Pie
+            data={data}
+            dataKey="amount"
+            nameKey="category"
+            innerRadius={60}
+            strokeWidth={5}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Pie>
+           <ChartLegend
+            content={<ChartLegendContent nameKey="category" />}
+            className="-translate-y-[2rem] flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// ============================================================================
+// FILE: components/dashboard/monthly-summary-chart.tsx
+// ============================================================================
+
+// components/dashboard/monthly-summary-chart.tsx (NEW FILE)
+
+"use client";
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { formatCurrency } from "@/lib/utils";
+
+interface MonthlySummaryChartProps {
+  data: {
+    month: string;
+    income: number;
+    expense: number;
+  }[];
+}
+
+const chartConfig = {
+  income: {
+    label: "Income",
+    color: "hsl(var(--chart-2))",
+  },
+  expense: {
+    label: "Expense",
+    color: "hsl(var(--chart-1))",
+  },
+} satisfies ChartConfig;
+
+export function MonthlySummaryChart({ data }: MonthlySummaryChartProps) {
+  if (data.length === 0) {
+    return (
+       <div className="h-96 flex items-center justify-center">
+          <p className="text-muted-foreground">No data for this period. Add transactions to see a summary.</p>
+       </div>
+    )
+  }
+
+  return (
+    <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+      <ResponsiveContainer>
+        <BarChart data={data}>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="month"
+            tickLine={false}
+            tickMargin={10}
+            axisLine={false}
+          />
+          <YAxis
+            tickFormatter={(value) => formatCurrency(value as number).split(".")[0]}
+          />
+          <ChartTooltip
+            cursor={false}
+            content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)}/>}
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Bar
+            dataKey="income"
+            fill="var(--color-income)"
+            radius={[4, 4, 0, 0]}
+          />
+          <Bar
+            dataKey="expense"
+            fill="var(--color-expense)"
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// ============================================================================
+// FILE: components/global/ThemeToggle.tsx
+// ============================================================================
+
+// components/global/ThemeToggle.tsx
+"use client";
+
+import * as React from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/button";
+
+export function ThemeToggle() {
+  const { setTheme, theme } = useTheme();
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+    >
+      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  );
+}
+
+// ============================================================================
+// FILE: components/global/logo.tsx
+// ============================================================================
+
+// components/global/logo.tsx
+
+import Link from "next/link";
+import { Gem } from "lucide-react"; // MODIFICATION: Changed icon from Wallet to Gem
+import { cn } from "@/lib/utils";
+
+interface LogoProps {
+  className?: string;
+  hideText?: boolean;
+}
+
+export function Logo({ className, hideText = false }: LogoProps) {
+  return (
+    <Link href="/" className={cn("flex items-center space-x-2", className)}>
+      <Gem className="h-6 w-6 text-primary" />
+      {!hideText && (
+        // MODIFICATION: Apply new logo font, increase size, and add gradient
+        <span className="hidden font-[var(--font-logo)] text-xl font-semibold sm:inline-block">
+          Finances Expert
+          <span className="ml-1 bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent dark:from-slate-200 dark:to-slate-400">
+            Pro
+          </span>
+        </span>
+      )}
+    </Link>
+  );
+}
+
+// ============================================================================
+// FILE: components/goals/add-goal-dialog.tsx
+// ============================================================================
+
+// components/goals/add-goal-dialog.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PlusCircle, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useToast } from "@/components/ui/use-toast";
+import { createGoal } from "@/lib/actions/goal.actions";
+import { cn } from "@/lib/utils";
+
+const formSchema = z.object({
+  name: z.string().min(1, "Goal name is required."),
+  targetAmount: z.coerce.number().positive("Target amount must be positive."),
+  deadline: z.date().optional(),
+});
+
+export function AddGoalDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const result = await createGoal(values);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Goal</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Set a New Goal</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Goal Name</FormLabel>
+                <FormControl><Input placeholder="e.g., Vacation Fund" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="targetAmount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Target Amount</FormLabel>
+                <FormControl><Input type="number" placeholder="5000.00" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="deadline" render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Deadline (Optional)</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+            )} />
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Creating..." : "Create Goal"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/goals/goal-card.tsx
+// ============================================================================
+
+// components/goals/goal-card.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import type { Goal } from "@prisma/client";
+import { format } from "date-fns";
+import {
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { formatCurrency } from "@/lib/utils";
+import { Button } from "../ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { Input } from "../ui/input";
+import { addFundsToGoal } from "@/lib/actions/goal.actions";
+import { useToast } from "../ui/use-toast";
+
+const addFundsSchema = z.object({
+  amount: z.coerce.number().positive("Amount must be a positive number."),
+});
+
+export function GoalCard({ goal }: { goal: Goal }) {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const progress = (goal.currentAmount / goal.targetAmount) * 100;
+
+  const form = useForm<z.infer<typeof addFundsSchema>>({
+    resolver: zodResolver(addFundsSchema),
+    defaultValues: { amount: 0 },
+  });
+
+  const onSubmit = async (values: z.infer<typeof addFundsSchema>) => {
+    const result = await addFundsToGoal({ goalId: goal.id, amount: values.amount });
+    if (result.success) {
+      toast({ title: "Success!", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{goal.name}</CardTitle>
+        {goal.deadline && (
+          <CardDescription>Deadline: {format(goal.deadline, "PPP")}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>{formatCurrency(goal.currentAmount)}</span>
+            <span>{formatCurrency(goal.targetAmount)}</span>
+          </div>
+          <Progress value={progress} />
+          <p className="text-sm font-medium">{progress.toFixed(0)}% Complete</p>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild><Button variant="secondary" className="w-full">Add Funds</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Funds to "{goal.name}"</DialogTitle></DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="amount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl><Input type="number" placeholder="100.00" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Adding..." : "Add Funds"}
+                </Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </CardFooter>
+    </Card>
+  );
+}
+
+// ============================================================================
+// FILE: components/investments/add-investment-dialog.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: components/investments/add-investment-dialog.tsx
+// ============================================================================
+
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PlusCircle } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { createInvestment } from "@/lib/actions/investment.actions";
+
+const formSchema = z.object({
+  name: z.string().min(1, "Name is required."),
+  ticker: z.string().min(1, "Ticker is required."),
+  quantity: z.coerce.number().positive("Quantity must be positive."),
+  purchasePrice: z.coerce.number().positive("Price must be positive."),
+});
+
+export function AddInvestmentDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { name: "", ticker: "", quantity: 0, purchasePrice: 0 },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const result = await createInvestment(values);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Investment</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Track New Investment</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Asset Name</FormLabel>
+                <FormControl><Input placeholder="Apple Inc." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="ticker" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ticker / Symbol</FormLabel>
+                <FormControl><Input placeholder="AAPL" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="quantity" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantity</FormLabel>
+                  <FormControl><Input type="number" step="any" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="purchasePrice" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Purchase Price ($)</FormLabel>
+                  <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Adding..." : "Add Investment"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/investments/investment-table.tsx
+// ============================================================================
+
+// ============================================================================
+// FILE: components/investments/investments-table.tsx
+// ============================================================================
+
+"use client";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { deleteInvestment } from "@/lib/actions/investment.actions";
+import { useToast } from "@/components/ui/use-toast";
+import type { Investment } from "@prisma/client";
+
+export function InvestmentsTable({ investments }: { investments: Investment[] }) {
+  const { toast } = useToast();
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this investment?")) {
+      const result = await deleteInvestment(id);
+      if (result.success) {
+        toast({ title: "Deleted", description: "Investment removed successfully." });
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+    }
+  };
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Ticker</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead className="text-right">Qty</TableHead>
+            <TableHead className="text-right">Buy Price</TableHead>
+            <TableHead className="text-right">Total Value</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {investments.map((inv) => (
+            <TableRow key={inv.id}>
+              <TableCell className="font-medium">{inv.ticker}</TableCell>
+              <TableCell>{inv.name}</TableCell>
+              <TableCell className="text-right">{inv.quantity}</TableCell>
+              <TableCell className="text-right">{formatCurrency(inv.purchasePrice)}</TableCell>
+              <TableCell className="text-right font-bold text-green-600">
+                {formatCurrency(inv.quantity * inv.purchasePrice)} {/* Mocking current value logic */}
+              </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(inv.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: components/landing/features.tsx
+// ============================================================================
+
+// components/landing/features.tsx
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DollarSign, BarChart, Trophy, Bot } from "lucide-react";
+
+const featureList = [
+    { icon: <DollarSign className="w-8 h-8 text-primary" />, title: "Transaction Management", description: "Log income and expenses with ease. Categorize, sort, and filter to understand your spending habits." },
+    { icon: <BarChart className="w-8 h-8 text-primary" />, title: "Financial Planning", description: "Create and track financial goals. Set budgets for spending categories and monitor your progress in real-time." },
+    { icon: <Trophy className="w-8 h-8 text-primary" />, title: "Gamification", description: "Earn XP and level up by managing your finances. Unlock new features and themes as you go." },
+    { icon: <Bot className="w-8 h-8 text-primary" />, title: "AI-Powered Insights", description: "Get a detailed analysis of your financial health with actionable recommendations from our integrated AI." },
+]
+
+export function Features() {
+  return (
+    <section id="features" className="w-full py-24 sm:py-32">
+        <div className="container">
+            <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need to Succeed</h2>
+                <p className="mt-4 text-lg text-muted-foreground">
+                    All the tools to take control of your financial future, in one place.
+                </p>
+            </div>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+                {featureList.map(feature => (
+                     <Card key={feature.title} className="text-center">
+                        <CardHeader>
+                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                               {feature.icon}
+                            </div>
+                            <CardTitle>{feature.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-muted-foreground">{feature.description}</p>
+                        </CardContent>
+                     </Card>
+                ))}
+            </div>
+        </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// FILE: components/landing/hero.tsx
+// ============================================================================
+
+// components/landing/hero.tsx
+"use client"
+
+import * as React from "react"
+import Image from "next/image"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
+import { Mockup, MockupFrame } from "@/components/ui/mockup"
+import { ArrowRight } from "lucide-react"
+
+interface HeroProps extends React.HTMLAttributes<HTMLDivElement> {
+  title: React.ReactNode
+  subtitle?: string
+  eyebrow?: string
+  ctaText?: string
+  ctaLink?: string
+  mockupImage?: {
+    src: string
+    alt: string
+    width: number
+    height: number
+  }
+}
+
+const Hero = React.forwardRef<HTMLDivElement, HeroProps>(
+  ({ className, title, subtitle, eyebrow, ctaText, ctaLink, mockupImage, ...props }, ref) => {
+    return (
+      <section
+        ref={ref}
+        className={cn("flex flex-col items-center bg-secondary/30", className)}
+        {...props}
+      >
+        <div className="container text-center pt-20 pb-16">
+            {eyebrow && (
+            <p 
+                className="font-instrument-sans uppercase tracking-[0.51em] leading-[133%] text-center text-sm md:text-base mb-8 text-foreground animate-appear opacity-0"
+            >
+                {eyebrow}
+            </p>
+            )}
+
+            <h1 
+            className="text-4xl md:text-6xl font-semibold leading-tight text-center text-foreground animate-appear opacity-0 [animation-delay:100ms]"
+            >
+            {title}
+            </h1>
+
+            {subtitle && (
+            <p 
+                className="text-lg md:text-xl max-w-3xl mx-auto text-center font-instrument-sans font-light mt-6 mb-8 leading-relaxed text-muted-foreground animate-appear opacity-0 [animation-delay:300ms]"
+            >
+                {subtitle}
+            </p>
+            )}
+
+            {ctaText && ctaLink && (
+            <Link href={ctaLink}>
+                <div 
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 h-12 text-lg font-medium text-primary-foreground transition-colors hover:bg-primary/90 animate-appear opacity-0 [animation-delay:500ms]"
+                >
+                <span>{ctaText}</span>
+                <ArrowRight className="h-5 w-5" />
+                </div>
+            </Link>
+            )}
+        </div>
+
+        {mockupImage && (
+          <div className="mt-12 w-full relative animate-appear opacity-0 [animation-delay:700ms]">
+            <MockupFrame>
+              <Mockup type="responsive">
+                <Image
+                  src={mockupImage.src}
+                  alt={mockupImage.alt}
+                  width={mockupImage.width}
+                  height={mockupImage.height}
+                  className="w-full h-auto"
+                  priority
+                />
+              </Mockup>
+            </MockupFrame>
+            <div
+              className="absolute bottom-0 left-0 right-0 w-full h-[303px]"
+              style={{
+                background: "linear-gradient(to top, oklch(from var(--secondary) l c h / 30%) 0%, oklch(from var(--secondary) l c h / 0%) 100%)",
+                zIndex: 10,
+              }}
+            />
+          </div>
+        )}
+      </section>
+    )
+  }
+)
+Hero.displayName = "Hero"
+
+export { Hero }
+
+// ============================================================================
+// FILE: components/landing/navbar.tsx
+// ============================================================================
+
+// components/landing/navbar.tsx
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Menu, Wallet } from "lucide-react"
+
+const navLinks = [
+  { name: "Features", href: "#features" },
+  { name: "Pricing", href: "#pricing" },
+  { name: "About", href: "#about" },
+]
+
+export function Navbar() {
+  const [open, setOpen] = React.useState(false)
+  const pathname = usePathname()
+
+  React.useEffect(() => {
+    setOpen(false)
+  }, [pathname])
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 max-w-screen-2xl items-center">
+        <div className="mr-4 hidden md:flex">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Wallet className="h-6 w-6" />
+            <span className="hidden font-bold sm:inline-block">
+              Finances Expert Pro
+            </span>
+          </Link>
+          <nav className="flex items-center gap-6 text-sm">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "transition-colors hover:text-foreground/80",
+                  "text-foreground/60"
+                )}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        
+        {/* Mobile Nav */}
+        <div className="flex items-center md:hidden">
+            <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+                <Button
+                variant="ghost"
+                className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                >
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle Menu</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="pr-0">
+                <Link
+                href="/"
+                className="mb-4 flex items-center"
+                onClick={() => setOpen(false)}
+                >
+                <Wallet className="mr-2 h-4 w-4" />
+                <span className="font-bold">Finances Expert Pro</span>
+                </Link>
+                <div className="flex flex-col gap-4">
+                {navLinks.map((link) => (
+                    <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                    className="text-muted-foreground"
+                    >
+                    {link.name}
+                    </Link>
+                ))}
+                </div>
+            </SheetContent>
+            </Sheet>
+            <Link href="/" className="flex items-center space-x-2">
+                <Wallet className="h-6 w-6" />
+                <span className="font-bold">Finances Pro</span>
+            </Link>
+        </div>
+        
+        <div className="flex flex-1 items-center justify-end space-x-2">
+            <Button asChild>
+                <Link href="/login">Get Started</Link>
+            </Button>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+// ============================================================================
+// FILE: components/landing/pricing.tsx
+// ============================================================================
+
+// components/landing/pricing.tsx
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+
+export function Pricing() {
+  return (
+    <section id="pricing" className="w-full py-24 sm:py-32">
+        <div className="container">
+            <div className="bg-secondary/30 rounded-lg p-8 md:p-12">
+                <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold">Simple, Transparent Pricing</h2>
+                    <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
+                    Start for free and unlock powerful features as you grow. No hidden fees, ever.
+                    </p>
+                </div>
+                <div className="flex justify-center">
+                    <Card className="w-full max-w-sm">
+                        <CardHeader className="text-center">
+                            <CardTitle>Pro Plan</CardTitle>
+                            <CardDescription>All features included.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-center">
+                            <p>
+                                <span className="text-4xl font-bold">$0</span>
+                                <span className="text-muted-foreground">/ month</span>
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-2">This project is for demonstration purposes.</p>
+                        </CardContent>
+                        <CardFooter>
+                            <Button asChild className="w-full">
+                                <Link href="/register">Get Started Now</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// FILE: components/layout/HeaderClient.tsx
+// ============================================================================
+
+// components/layout/HeaderClient.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Menu,
+  X,
+  LogOut,
+  Settings,
+  LayoutDashboard,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Logo } from "../global/logo";
+import { siteConfig } from "@/lib/config";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { signOut } from "next-auth/react";
+import { Skeleton } from "../ui/skeleton";
+import { ThemeToggle } from "@/components/global/ThemeToggle";
+
+// Dummy user type since next-auth types aren't fully available
+interface DummyUser {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+
+interface HeaderClientProps {
+  user: DummyUser | null;
+}
+
+export function HeaderClient({ user }: HeaderClientProps) {
+  const [menuState, setMenuState] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState(
+    siteConfig.menuItems[0]?.id || ""
+  );
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: `-50% 0px -50% 0px` }
+    );
+
+    const sections = siteConfig.menuItems
+      .map((item) => document.getElementById(item.id))
+      .filter((el): el is HTMLElement => el !== null);
+      
+    sections.forEach((section) => observer.observe(section));
+
+    return () => sections.forEach((section) => observer.unobserve(section));
+  }, []);
+
+  const getInitials = (name?: string | null) =>
+    name
+      ? name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+      : "U";
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50">
+      <nav
+        data-state={menuState ? "active" : "inactive"}
+        className="w-full px-2 group"
+      >
+        <div
+          className={cn(
+            "mx-auto mt-2 flex items-center justify-between transition-all duration-300",
+            isScrolled
+              ? "max-w-4xl rounded-full border border-border/40 bg-background/60 p-2 pl-4 backdrop-blur-lg shadow-sm"
+              : "max-w-6xl p-2.5"
+          )}
+        >
+          <div className="flex items-center">
+            <Logo hideText={false} className="text-foreground" />
+          </div>
+
+          <div className="hidden lg:flex">
+            <ul
+              className={cn(
+                "relative flex items-center gap-4 text-sm transition-all duration-300",
+                isScrolled && "ml-4"
+              )}
+            >
+              {siteConfig.menuItems.map((item) => (
+                <li key={item.id} className="relative">
+                  <Link
+                    href={item.href}
+                    onClick={() => setActiveSection(item.id)}
+                    className={cn(
+                      "block px-3 py-1.5 transition-colors",
+                      activeSection === item.id
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>{item.name}</span>
+                  </Link>
+                  {activeSection === item.id && (
+                    <motion.div
+                      layoutId="active-pill"
+                      className="absolute inset-0 z-[-1] rounded-full bg-secondary/50"
+                      transition={{
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 30,
+                      }}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
+              <ThemeToggle />
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="overflow-hidden rounded-full h-8 w-8"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={user?.image || undefined}
+                          alt={user?.name || "User"}
+                        />
+                        <AvatarFallback>
+                          {getInitials(user?.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {user?.name || <Skeleton className="h-4 w-20" />}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user?.email || (
+                            <Skeleton className="h-3 w-32 mt-1" />
+                          )}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center w-full"
+                      >
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/settings"
+                        className="flex items-center w-full"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                  <Button asChild size="sm">
+                    <Link href="/register">Get Started</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setMenuState(!menuState)}
+              aria-label={menuState ? "Close Menu" : "Open Menu"}
+              className="relative z-20 -m-2.5 block cursor-pointer p-2.5 lg:hidden text-foreground"
+            >
+              <Menu className="group-data-[state=inactive]:scale-100 group-data-[state=inactive]:opacity-100 group-data-[state=active]:scale-0 group-data-[state=active]:opacity-0 m-auto size-6 transition-all duration-200" />
+              <X className="group-data-[state=inactive]:scale-0 group-data-[state=inactive]:opacity-0 group-data-[state=active]:scale-100 group-data-[state=active]:opacity-100 absolute inset-0 m-auto size-6 transition-all duration-200" />
+            </button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {menuState && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="lg:hidden absolute left-0 w-full mt-2 px-2"
+            >
+              <div className="rounded-2xl border border-border/40 bg-background/95 p-6 backdrop-blur-lg shadow-xl">
+                <ul className="space-y-6 text-base">
+                  {siteConfig.menuItems.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMenuState(false)}
+                        className="text-muted-foreground hover:text-foreground block duration-150"
+                      >
+                        <span>{item.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <div className="w-full border-t border-border/10 pt-4 mt-6 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Theme</span>
+                    <ThemeToggle />
+                  </div>
+                  <div className="flex flex-col gap-3 w-full">
+                    {user ? (
+                      <Button asChild className="w-full">
+                        <Link href="/dashboard">Dashboard</Link>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button asChild variant="outline" className="w-full">
+                          <Link href="/login">Sign In</Link>
+                        </Button>
+                        <Button asChild className="w-full">
+                          <Link href="/register">Get Started</Link>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
+    </header>
+  );
+}
+
+// ============================================================================
+// FILE: components/layout/footer.tsx
+// ============================================================================
+
+// components/layout/footer.tsx
+import { siteConfig } from "@/lib/config";
+import { Logo } from "../global/logo";
+
+export function Footer() {
+    return (
+        <footer className="border-t">
+            <div className="container py-12">
+                <div className="flex flex-col items-center justify-center gap-4">
+                    <Logo />
+                    <p className="text-center text-sm leading-loose text-muted-foreground">
+                        Built with Next.js and Shadcn/UI.
+                    </p>
+                     <p className="text-center text-sm text-muted-foreground">
+                        © {new Date().getFullYear()} {siteConfig.name}. All Rights Reserved.
+                    </p>
+                </div>
+            </div>
+        </footer>
+    )
+}
+
+// ============================================================================
+// FILE: components/layout/header-main.tsx
+// ============================================================================
+
+// components/layout/header-main.tsx
+
+"use client";
+
+import Link from "next/link";
+import { User } from "next-auth";
+import { signOut } from "next-auth/react";
+import { Search, LogOut, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
+
+interface HeaderMainProps {
+  user: User;
+}
+
+export function HeaderMain({ user }: HeaderMainProps) {
+  return (
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="sm:hidden" /> {/* For mobile */}
+        <SidebarTrigger className="hidden sm:flex" /> {/* For desktop */}
+      </div>
+
+      <div className="relative ml-auto flex-1 md:grow-0">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search..."
+          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+        />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="overflow-hidden rounded-full"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
+              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>{user.name ?? "My Account"}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/settings">
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  );
+}
+
+// ============================================================================
+// FILE: components/layout/header.tsx
+// ============================================================================
+
+// components/layout/header.tsx
+import { HeaderClient } from "./HeaderClient";
+
+export async function Header() {
+  // In a real app, you would fetch the server session here:
+  // const session = await getServerSession(authOptions);
+  // For this landing page, we'll assume the user is not logged in.
+  const user = null;
+  return <HeaderClient user={user} />;
+}
+
+// ============================================================================
+// FILE: components/layout/sidebar.tsx
+// ============================================================================
+
+// components/layout/sidebar.tsx
+
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { User } from "next-auth";
+import {
+  Sidebar as ShadcnSidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
+import { Logo } from "@/components/global/logo";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  LayoutDashboard,
+  Wallet,
+  Landmark,
+  Target,
+  BarChart,
+  Settings,
+} from "lucide-react";
+import { getInitials } from "@/lib/utils"; 
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", icon: Wallet },
+  { href: "/budgets", label: "Budgets", icon: Landmark }, // This is already here
+  { href: "/goals", label: "Goals", icon: Target },     // This is already here
+  { href: "/investments", label: "Investments", icon: BarChart },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+interface SidebarProps {
+  user: User;
+}
+
+export function Sidebar({ user }: SidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <ShadcnSidebar>
+      <SidebarHeader>
+        <Logo />
+      </SidebarHeader>
+      
+      {/* MODIFICATION: Added mt-8 to create space below the logo */}
+      <SidebarContent className="mt-8">
+        <SidebarMenu className="gap-y-2">
+          {navItems.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === item.href}
+                tooltip={item.label}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <div className="flex items-center gap-3 p-2">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={user.image ?? undefined} />
+            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+          </Avatar>
+          <div className="overflow-hidden whitespace-nowrap">
+            <p className="font-medium truncate">{user.name}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user.email}
+            </p>
+          </div>
+        </div>
+      </SidebarFooter>
+    </ShadcnSidebar>
+  );
+}
+
+// ============================================================================
+// FILE: components/providers.tsx
+// ============================================================================
+
+// components/providers.tsx
+"use client";
+
+import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { type ThemeProviderProps } from "next-themes";
+import { SessionProvider } from "next-auth/react";
+
+export function Providers({ children, ...props }: ThemeProviderProps) {
+  return (
+    <SessionProvider>
+      <NextThemesProvider {...props}>{children}</NextThemesProvider>
+    </SessionProvider>
+  );
+}
+
+// ============================================================================
+// FILE: components/transactions/add-transaction-dialog.tsx
+// ============================================================================
+
+// components/transactions/add-transaction-dialog.tsx
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { CalendarIcon, PlusCircle } from "lucide-react";
+import { format } from "date-fns";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { createTransaction } from "@/lib/actions/transaction.actions";
+import { useToast } from "@/components/ui/use-toast"; // We need to create this hook
+
+const formSchema = z.object({
+  name: z.string().min(1, "Name is required."),
+  amount: z.coerce.number().positive("Amount must be a positive number."),
+  type: z.enum(["INCOME", "EXPENSE"]),
+  category: z.string().min(1, "Category is required."),
+  date: z.date(),
+});
+
+const categories = {
+  INCOME: ["Salary", "Freelance", "Investment", "Other"],
+  EXPENSE: ["Food", "Transport", "Housing", "Entertainment", "Utilities", "Other"],
+};
+
+export function AddTransactionDialog() {
+  const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      amount: 0,
+      type: "EXPENSE",
+      date: new Date(),
+    },
+  });
+
+  const transactionType = form.watch("type");
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    const result = await createTransaction(values);
+    setIsLoading(false);
+
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Transaction
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add a New Transaction</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Coffee" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Amount</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="0.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="INCOME">Income</SelectItem>
+                        <SelectItem value="EXPENSE">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories[transactionType].map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Adding..." : "Add Transaction"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/transactions/transactions-table.tsx
+// ============================================================================
+
+// components/transactions/transactions-table.tsx
+"use client";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import type { Transaction } from "@prisma/client";
+import { formatCurrency } from "@/lib/utils";
+
+interface TransactionsTableProps {
+  transactions: Transaction[];
+}
+
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
+  return (
+    <div className="rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transactions.map((transaction) => (
+            <TableRow key={transaction.id}>
+              <TableCell className="font-medium">{transaction.name}</TableCell>
+              <TableCell>
+                 <Badge variant="outline">{transaction.category}</Badge>
+              </TableCell>
+              <TableCell>{format(transaction.date, "PPP")}</TableCell>
+              <TableCell
+                className={`text-right font-medium ${
+                  transaction.type === "INCOME"
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {transaction.type === "INCOME" ? "+" : "-"}
+                {formatCurrency(transaction.amount)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 // ============================================================================
 // FILE: components/ui/accordion.tsx
@@ -4502,6 +7447,57 @@ export {
 
 
 // ============================================================================
+// FILE: components/ui/mockup.tsx
+// ============================================================================
+
+// components/ui/mockup.tsx
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const MockupFrame = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "relative mx-auto border-gray-800 dark:border-gray-800 bg-gray-800 border-[14px] rounded-t-3xl h-[600px] w-full max-w-4xl",
+      className
+    )}
+    {...props}
+  />
+))
+MockupFrame.displayName = "MockupFrame"
+
+interface MockupProps extends React.HTMLAttributes<HTMLDivElement> {
+  type?: "responsive" | "mobile"
+}
+
+const Mockup = React.forwardRef<HTMLDivElement, MockupProps>(
+  ({ className, type = "responsive", children, ...props }, ref) => {
+    if (type === "responsive") {
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            "rounded-t-xl overflow-hidden w-full h-full bg-white dark:bg-black",
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </div>
+      )
+    }
+    // Add other mockup types here if needed
+    return null
+  }
+)
+Mockup.displayName = "Mockup"
+
+export { Mockup, MockupFrame }
+
+// ============================================================================
 // FILE: components/ui/navigation-menu.tsx
 // ============================================================================
 
@@ -6592,6 +9588,182 @@ export { Textarea }
 
 
 // ============================================================================
+// FILE: components/ui/toast.tsx
+// ============================================================================
+
+// components/ui/toast.tsx
+"use client"
+
+import * as React from "react"
+import * as ToastPrimitives from "@radix-ui/react-toast"
+import { cva, type VariantProps } from "class-variance-authority"
+import { X } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+const ToastProvider = ToastPrimitives.Provider
+
+const ToastViewport = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Viewport>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Viewport>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Viewport
+    ref={ref}
+    className={cn(
+      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      className
+    )}
+    {...props}
+  />
+))
+ToastViewport.displayName = ToastPrimitives.Viewport.displayName
+
+const toastVariants = cva(
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-6 pr-8 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full",
+  {
+    variants: {
+      variant: {
+        default: "border bg-background text-foreground",
+        destructive:
+          "destructive group border-destructive bg-destructive text-destructive-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+const Toast = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Root>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
+    VariantProps<typeof toastVariants>
+>(({ className, variant, ...props }, ref) => {
+  return (
+    <ToastPrimitives.Root
+      ref={ref}
+      className={cn(toastVariants({ variant }), className)}
+      {...props}
+    />
+  )
+})
+Toast.displayName = ToastPrimitives.Root.displayName
+
+const ToastAction = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Action>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Action>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Action
+    ref={ref}
+    className={cn(
+      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive",
+      className
+    )}
+    {...props}
+  />
+))
+ToastAction.displayName = ToastPrimitives.Action.displayName
+
+const ToastClose = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Close>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Close
+    ref={ref}
+    className={cn(
+      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600",
+      className
+    )}
+    toast-close=""
+    {...props}
+  >
+    <X className="h-4 w-4" />
+  </ToastPrimitives.Close>
+))
+ToastClose.displayName = ToastPrimitives.Close.displayName
+
+const ToastTitle = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Title>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Title
+    ref={ref}
+    className={cn("text-sm font-semibold", className)}
+    {...props}
+  />
+))
+ToastTitle.displayName = ToastPrimitives.Title.displayName
+
+const ToastDescription = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Description>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Description
+    ref={ref}
+    className={cn("text-sm opacity-90", className)}
+    {...props}
+  />
+))
+ToastDescription.displayName = ToastPrimitives.Description.displayName
+
+type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
+
+type ToastActionElement = React.ReactElement<typeof ToastAction>
+
+export {
+  type ToastProps,
+  type ToastActionElement,
+  ToastProvider,
+  ToastViewport,
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  ToastClose,
+  ToastAction,
+}
+
+// ============================================================================
+// FILE: components/ui/toaster.tsx
+// ============================================================================
+
+// components/ui/toaster.tsx
+"use client"
+
+import {
+  Toast,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+} from "@/components/ui/toast"
+import { useToast } from "@/components/ui/use-toast"
+
+export function Toaster() {
+  const { toasts } = useToast()
+
+  return (
+    <ToastProvider>
+      {toasts.map(function ({ id, title, description, action, ...props }) {
+        return (
+          <Toast key={id} {...props}>
+            <div className="grid gap-1">
+              {title && <ToastTitle>{title}</ToastTitle>}
+              {description && (
+                <ToastDescription>{description}</ToastDescription>
+              )}
+            </div>
+            {action}
+            <ToastClose />
+          </Toast>
+        )
+      })}
+      <ToastViewport />
+    </ToastProvider>
+  )
+}
+
+// ============================================================================
 // FILE: components/ui/toggle-group.tsx
 // ============================================================================
 
@@ -6801,6 +9973,199 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 
 // ============================================================================
+// FILE: components/ui/use-toast.ts
+// ============================================================================
+
+// components/ui/use-toast.ts
+
+import * as React from "react"
+import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
+
+const TOAST_LIMIT = 1
+const TOAST_REMOVE_DELAY = 1000000
+
+type ToasterToast = ToastProps & {
+  id: string
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: ToastActionElement
+}
+
+const actionTypes = {
+  ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
+  DISMISS_TOAST: "DISMISS_TOAST",
+  REMOVE_TOAST: "REMOVE_TOAST",
+} as const
+
+let count = 0
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER
+  return count.toString()
+}
+
+type ActionType = typeof actionTypes
+
+type Action =
+  | {
+      type: ActionType["ADD_TOAST"]
+      toast: ToasterToast
+    }
+  | {
+      type: ActionType["UPDATE_TOAST"]
+      toast: Partial<ToasterToast>
+    }
+  | {
+      type: ActionType["DISMISS_TOAST"]
+      toastId?: ToasterToast["id"]
+    }
+  | {
+      type: ActionType["REMOVE_TOAST"]
+      toastId?: ToasterToast["id"]
+    }
+
+interface State {
+  toasts: ToasterToast[]
+}
+
+const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
+const addToRemoveQueue = (toastId: string) => {
+  if (toastTimeouts.has(toastId)) {
+    return
+  }
+
+  const timeout = setTimeout(() => {
+    toastTimeouts.delete(toastId)
+    dispatch({
+      type: "REMOVE_TOAST",
+      toastId: toastId,
+    })
+  }, TOAST_REMOVE_DELAY)
+
+  toastTimeouts.set(toastId, timeout)
+}
+
+export const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case "ADD_TOAST":
+      return {
+        ...state,
+        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+      }
+
+    case "UPDATE_TOAST":
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === action.toast.id ? { ...t, ...action.toast } : t
+        ),
+      }
+
+    case "DISMISS_TOAST": {
+      const { toastId } = action
+
+      // ! Side-effect in a reducer...
+      if (toastId) {
+        addToRemoveQueue(toastId)
+      } else {
+        state.toasts.forEach((toast) => {
+          addToRemoveQueue(toast.id)
+        })
+      }
+
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === toastId || toastId === undefined
+            ? {
+                ...t,
+                open: false,
+              }
+            : t
+        ),
+      }
+    }
+    case "REMOVE_TOAST":
+      if (action.toastId === undefined) {
+        return {
+          ...state,
+          toasts: [],
+        }
+      }
+      return {
+        ...state,
+        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+      }
+  }
+}
+
+const listeners: Array<(state: State) => void> = []
+
+let memoryState: State = { toasts: [] }
+
+function dispatch(action: Action) {
+  memoryState = reducer(memoryState, action)
+  listeners.forEach((listener) => {
+    listener(memoryState)
+  })
+}
+
+type Toast = Omit<ToasterToast, "id">
+
+function toast(props: Toast) {
+  const id = genId()
+
+  const update = (props: ToasterToast) =>
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: { ...props, id },
+    })
+  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+
+  dispatch({
+    type: "ADD_TOAST",
+    toast: {
+      ...props,
+      id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss()
+      },
+    },
+  })
+
+  return {
+    id: id,
+    dismiss,
+    update,
+  }
+}
+
+function useToast() {
+  const [state, setState] = React.useState<State>(memoryState)
+
+  React.useEffect(() => {
+    listeners.push(setState)
+    return () => {
+      const index = listeners.indexOf(setState)
+      if (index > -1) {
+        listeners.splice(index, 1)
+      }
+    }
+  }, [state])
+
+  return {
+    ...state,
+    toast,
+    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+  }
+}
+
+export { useToast, toast }
+
+// ============================================================================
 // FILE: eslint.config.mjs
 // ============================================================================
 
@@ -6850,16 +10215,451 @@ export function useIsMobile() {
 
 
 // ============================================================================
+// FILE: lib/actions/ai.actions.ts
+// ============================================================================
+
+// ============================================================================
+// FILE: lib/actions/ai.actions.ts
+// ============================================================================
+
+"use server";
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+export async function generateFinancialInsights() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  // In a real implementation, you would:
+  // 1. Fetch user transactions/budgets/goals from Prisma.
+  // 2. Format a prompt for the Gemini API.
+  // 3. Call the Gemini API.
+  
+  // MOCK RESPONSE
+  await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate latency
+
+  return {
+    score: 78,
+    summary: "Your financial health is stable. You are consistently saving, but your dining out expenses have increased by 15% compared to last month.",
+    recommendations: [
+      "Consider reducing 'Entertainment' spending to reach your 'Vacation Fund' goal faster.",
+      "You have surplus cash flow this month; consider moving $200 into your investment portfolio.",
+      "Review your recurring subscriptions; 2 services haven't been used in 30 days."
+    ]
+  };
+}
+
+// ============================================================================
+// FILE: lib/actions/budget.actions.ts
+// ============================================================================
+
+// lib/actions/budget.actions.ts (NEW FILE)
+
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { startOfMonth, endOfMonth } from "date-fns";
+
+// Zod schema for validation
+const budgetSchema = z.object({
+  category: z.string().min(1, "Category is required."),
+  limit: z.coerce.number().positive("Limit must be a positive number."),
+});
+
+// Create a new budget
+export async function createBudget(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = budgetSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  // Check for existing budget in the same category
+  const existingBudget = await prisma.budget.findFirst({
+    where: { userId, category: result.data.category },
+  });
+
+  if (existingBudget) {
+    return { success: false, message: "A budget for this category already exists." };
+  }
+
+  try {
+    await prisma.budget.create({
+      data: { ...result.data, userId },
+    });
+    revalidatePath("/budgets");
+    return { success: true, message: "Budget created successfully." };
+  } catch (error) {
+    console.error("CREATE_BUDGET_ERROR", error);
+    return { success: false, message: "Failed to create budget." };
+  }
+}
+
+// Get all budgets and calculate current spending for each
+export async function getBudgetsWithSpending() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Authentication required.");
+  const userId = session.user.id;
+
+  const budgets = await prisma.budget.findMany({ where: { userId } });
+  
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+
+  const monthlyExpenses = await prisma.transaction.groupBy({
+    by: ['category'],
+    where: {
+      userId,
+      type: 'EXPENSE',
+      date: { gte: monthStart, lte: monthEnd },
+    },
+    _sum: { amount: true },
+  });
+  
+  const spendingMap = new Map(
+    monthlyExpenses.map(item => [item.category, item._sum.amount ?? 0])
+  );
+
+  return budgets.map(budget => {
+    const spent = spendingMap.get(budget.category) ?? 0;
+    const remaining = budget.limit - spent;
+    const progress = (spent / budget.limit) * 100;
+    return { ...budget, spent, remaining, progress };
+  });
+}
+
+// ============================================================================
+// FILE: lib/actions/goal.actions.ts
+// ============================================================================
+
+// lib/actions/goal.actions.ts (NEW FILE)
+
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+
+// Zod schema for creating a goal
+const goalSchema = z.object({
+  name: z.string().min(1, "Goal name is required."),
+  targetAmount: z.coerce.number().positive("Target amount must be positive."),
+  deadline: z.date().optional(),
+});
+
+// Zod schema for adding funds
+const addFundsSchema = z.object({
+  goalId: z.string(),
+  amount: z.coerce.number().positive("Amount must be a positive number."),
+});
+
+
+export async function createGoal(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = goalSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  try {
+    await prisma.goal.create({
+      data: { ...result.data, userId },
+    });
+    revalidatePath("/goals");
+    return { success: true, message: "Goal created successfully." };
+  } catch (error) {
+    console.error("CREATE_GOAL_ERROR", error);
+    return { success: false, message: "Failed to create goal." };
+  }
+}
+
+export async function getGoals() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) throw new Error("Authentication required.");
+    const userId = session.user.id;
+
+    return await prisma.goal.findMany({ where: { userId } });
+}
+
+export async function addFundsToGoal(formData: unknown) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return { success: false, message: "Authentication required." };
+    }
+    const userId = session.user.id;
+
+    const result = addFundsSchema.safeParse(formData);
+    if (!result.success) {
+        return { success: false, message: "Invalid data provided." };
+    }
+
+    const { goalId, amount } = result.data;
+
+    try {
+        // Use a transaction to ensure both operations succeed or fail together
+        await prisma.$transaction([
+            prisma.goal.update({
+                where: { id: goalId, userId }, // Ensure user owns the goal
+                data: { currentAmount: { increment: amount } },
+            }),
+            prisma.transaction.create({
+                data: {
+                    name: `Contribution to Goal`,
+                    amount: amount,
+                    type: "EXPENSE",
+                    category: "Savings", // A dedicated category for goal contributions
+                    frequency: "ONCE",
+                    date: new Date(),
+                    userId: userId,
+                },
+            }),
+        ]);
+
+        revalidatePath("/goals");
+        revalidatePath("/dashboard");
+        revalidatePath("/transactions");
+
+        return { success: true, message: "Funds added successfully!" };
+    } catch (error) {
+        console.error("ADD_FUNDS_ERROR", error);
+        return { success: false, message: "Failed to add funds." };
+    }
+}
+
+// ============================================================================
+// FILE: lib/actions/investment.actions.ts
+// ============================================================================
+
+// ============================================================================
+// FILE: lib/actions/investment.actions.ts
+// ============================================================================
+
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+
+const investmentSchema = z.object({
+  name: z.string().min(1, "Name is required."),
+  ticker: z.string().min(1, "Ticker is required.").toUpperCase(),
+  quantity: z.coerce.number().positive("Quantity must be positive."),
+  purchasePrice: z.coerce.number().positive("Price must be positive."),
+});
+
+export async function createInvestment(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = investmentSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  try {
+    const { quantity, purchasePrice } = result.data;
+    // We assume current value starts same as purchase price for manual entry
+    const currentValue = quantity * purchasePrice; 
+
+    await prisma.investment.create({
+      data: {
+        ...result.data,
+        currentValue, 
+        userId,
+      },
+    });
+    
+    revalidatePath("/investments");
+    return { success: true, message: "Investment added successfully." };
+  } catch (error) {
+    console.error("CREATE_INVESTMENT_ERROR", error);
+    return { success: false, message: "Failed to create investment." };
+  }
+}
+
+export async function getInvestments() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Authentication required.");
+  
+  return await prisma.investment.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function deleteInvestment(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { success: false, message: "Unauthorized" };
+
+  try {
+    await prisma.investment.delete({
+      where: { id, userId: session.user.id },
+    });
+    revalidatePath("/investments");
+    return { success: true, message: "Investment deleted." };
+  } catch (error) {
+    return { success: false, message: "Failed to delete investment." };
+  }
+}
+
+// ============================================================================
+// FILE: lib/actions/transaction.actions.ts
+// ============================================================================
+
+// lib/actions/transaction.actions.ts
+
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+
+// Zod schema for validation
+const transactionSchema = z.object({
+  name: z.string().min(1, "Name is required."),
+  amount: z.coerce.number().positive("Amount must be a positive number."),
+  type: z.enum(["INCOME", "EXPENSE"]),
+  category: z.string().min(1, "Category is required."),
+  date: z.date(),
+});
+
+// Server Action to create a transaction
+export async function createTransaction(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = transactionSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  try {
+    await prisma.transaction.create({
+      data: {
+        ...result.data,
+        userId,
+        // Prisma expects frequency, even if we don't use it in the form yet
+        frequency: "ONCE", 
+      },
+    });
+    
+    // Revalidate paths to update UI
+    revalidatePath("/dashboard");
+    revalidatePath("/transactions");
+
+    return { success: true, message: "Transaction added successfully." };
+  } catch (error) {
+    console.error("CREATE_TRANSACTION_ERROR", error);
+    return { success: false, message: "Failed to create transaction." };
+  }
+}
+
+// Server Action to get all transactions for the current user
+export async function getTransactions() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("Authentication required.");
+  }
+  const userId = session.user.id;
+  
+  const transactions = await prisma.transaction.findMany({
+    where: { userId },
+    orderBy: { date: "desc" },
+  });
+
+  return transactions;
+}
+
+// ============================================================================
+// FILE: lib/config.ts
+// ============================================================================
+
+// lib/config.ts
+export const siteConfig = {
+  name: "Finances Expert Pro",
+  description: "The Smart Way to Manage Your Personal Finances.",
+  menuItems: [
+    { id: "features", name: "Features", href: "#features" },
+    { id: "pricing", name: "Pricing", href: "#pricing" },
+    { id: "about", name: "About", href: "#about" },
+  ],
+};
+
+// ============================================================================
+// FILE: lib/prisma.ts
+// ============================================================================
+
+// lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+const prisma = global.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  global.prisma = prisma;
+}
+
+export default prisma;
+
+// ============================================================================
 // FILE: lib/utils.ts
 // ============================================================================
 
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+// lib/utils.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
+export function getInitials(name?: string | null) {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+export function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+}
 
 // ============================================================================
 // FILE: next-env.d.ts
@@ -6867,7 +10667,7 @@ export function cn(...inputs: ClassValue[]) {
 
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
-import "./.next/types/routes.d.ts";
+import "./.next/dev/types/routes.d.ts";
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
@@ -6902,6 +10702,8 @@ export default nextConfig;
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@next-auth/prisma-adapter": "^1.0.7",
+    "@prisma/client": "^6.19.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
@@ -6925,22 +10727,29 @@ export default nextConfig;
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.23.24",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.555.0",
     "next": "16.0.5",
+    "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
+    "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-day-picker": "^9.11.2",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.66.1",
+    "react-icons": "^5.5.0",
     "react-resizable-panels": "^3.0.6",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
@@ -6974,6 +10783,191 @@ const config = {
 
 export default config;
 
+
+// ============================================================================
+// FILE: prisma.config.ts
+// ============================================================================
+
+import { defineConfig, env } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  engine: "classic",
+  datasource: {
+    url: env("DATABASE_URL"),
+  },
+});
+
+
+// ============================================================================
+// FILE: prisma/schema.prisma
+// ============================================================================
+
+// prisma/schema.prisma
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["mongoDb"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth Models
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application Models
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+
+  // App-specific relations
+  transactions Transaction[]
+  goals        Goal[]
+  assets       Asset[]
+  investments  Investment[]
+  budgets      Budget[]
+  gameState    GameState?
+}
+
+model Transaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  name      String
+  amount    Float
+  type      String // INCOME or EXPENSE
+  category  String
+  frequency String // ONCE, MONTHLY, YEARLY
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Goal {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  name          String
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  deadline      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  name      String
+  value     Float
+  type      String // SAVINGS, REAL_ESTATE, OTHER
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Investment {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  name          String
+  ticker        String
+  quantity      Float
+  purchasePrice Float
+  currentValue  Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Budget {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  category  String
+  limit     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GameState {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String @unique @db.ObjectId
+  level   Int    @default(1)
+  xp      Int    @default(0)
+  rewards Json? // JSON is supported in MongoDB
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// FILE: prroxy.ts
+// ============================================================================
+
+// proxy.ts (This is the corrected file)
+
+export { default } from "next-auth/middleware";
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - login (login page)
+     * - register (register page)
+     * - / (the root landing page)
+     * - any files with an extension (e.g. .png)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|login|register|$|.*\\.).*)",
+  ],
+};
 
 // ============================================================================
 // FILE: tsconfig.json
@@ -7016,8 +11010,28 @@ export default config;
 
 
 // ============================================================================
+// FILE: types/next-auth.d.ts
+// ============================================================================
+
+// types/next-auth.d.ts
+
+import NextAuth, { DefaultSession } from "next-auth";
+
+declare module "next-auth" {
+  /**
+   * Returned by `useSession`, `getSession` and received as a prop on the `SessionProvider` React Context
+   */
+  interface Session {
+    user: {
+      /** The user's id. */
+      id: string;
+    } & DefaultSession["user"];
+  }
+}
+
+// ============================================================================
 // END OF CONTEXT
 // ============================================================================
-// Total files included: 65
-// Generated: Thu Nov 27 11:18:18 CET 2025
+// Total files included: 114
+// Generated: Mon Dec  8 14:28:18 CET 2025
 // ============================================================================
