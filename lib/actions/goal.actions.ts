@@ -1,4 +1,4 @@
-// lib/actions/goal.actions.ts (NEW FILE)
+// lib/actions/goal.actions.ts
 
 "use server";
 
@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
 
 // Zod schema for creating a goal
 const goalSchema = z.object({
@@ -38,6 +39,9 @@ export async function createGoal(formData: unknown) {
     await prisma.goal.create({
       data: { ...result.data, userId },
     });
+
+    await addXp("ADD_GOAL");
+
     revalidatePath("/goals");
     return { success: true, message: "Goal created successfully." };
   } catch (error) {
@@ -69,6 +73,9 @@ export async function addFundsToGoal(formData: unknown) {
     const { goalId, amount } = result.data;
 
     try {
+        const goal = await prisma.goal.findUnique({ where: {id: goalId}});
+        if(!goal) return { success: false, message: "Goal not found." };
+
         // Use a transaction to ensure both operations succeed or fail together
         await prisma.$transaction([
             prisma.goal.update({
@@ -77,7 +84,7 @@ export async function addFundsToGoal(formData: unknown) {
             }),
             prisma.transaction.create({
                 data: {
-                    name: `Contribution to Goal`,
+                    name: `Contribution to "${goal.name}"`,
                     amount: amount,
                     type: "EXPENSE",
                     category: "Savings", // A dedicated category for goal contributions
@@ -87,6 +94,8 @@ export async function addFundsToGoal(formData: unknown) {
                 },
             }),
         ]);
+
+        await addXp("FUND_GOAL");
 
         revalidatePath("/goals");
         revalidatePath("/dashboard");

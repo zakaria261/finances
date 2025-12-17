@@ -10810,12 +10810,10 @@ export default defineConfig({
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["mongoDb"]
 }
 
 datasource db {
   provider = "mongodb"
-  url      = env("DATABASE_URL")
 }
 
 // NextAuth Models
@@ -11033,5 +11031,5 @@ declare module "next-auth" {
 // END OF CONTEXT
 // ============================================================================
 // Total files included: 114
-// Generated: Mon Dec  8 14:28:18 CET 2025
+// Generated: Mon Dec  8 15:34:20 CET 2025
 // ============================================================================

@@ -23,15 +23,19 @@ import {
   Target,
   BarChart,
   Settings,
+  Home,
+  CreditCard,
 } from "lucide-react";
 import { getInitials } from "@/lib/utils"; 
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Wallet },
-  { href: "/budgets", label: "Budgets", icon: Landmark }, // This is already here
-  { href: "/goals", label: "Goals", icon: Target },     // This is already here
+  { href: "/budgets", label: "Budgets", icon: Landmark },
+  { href: "/goals", label: "Goals", icon: Target },
   { href: "/investments", label: "Investments", icon: BarChart },
+  { href: "/patrimoine", label: "Patrimoine", icon: Home },
+  { href: "/debts", label: "Debts", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -48,7 +52,6 @@ export function Sidebar({ user }: SidebarProps) {
         <Logo />
       </SidebarHeader>
       
-      {/* MODIFICATION: Added mt-8 to create space below the logo */}
       <SidebarContent className="mt-8">
         <SidebarMenu className="gap-y-2">
           {navItems.map((item) => (

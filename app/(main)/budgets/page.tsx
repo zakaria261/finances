@@ -1,15 +1,16 @@
-// app/(main)/budgets/page.tsx (NEW FILE)
 import { getBudgetsWithSpending } from "@/lib/actions/budget.actions";
 import { AddBudgetDialog } from "@/components/budgets/add-budget-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
+import { Empty } from "@/components/ui/empty";
+import { Landmark } from "lucide-react";
 
 export default async function BudgetsPage() {
   const budgets = await getBudgetsWithSpending();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold leading-none tracking-tight">Budgets</h1>
         <AddBudgetDialog />
@@ -38,10 +39,13 @@ export default async function BudgetsPage() {
           ))}
         </div>
       ) : (
-        <Card className="flex flex-col items-center justify-center p-8">
-            <CardTitle>No Budgets Found</CardTitle>
-            <CardDescription className="mt-2">Create a budget to start tracking your spending.</CardDescription>
-        </Card>
+        <Empty>
+            <Landmark className="h-12 w-12 text-muted-foreground" />
+            <div className="text-center">
+                <h3 className="text-lg font-semibold">No Budgets Found</h3>
+                <p className="text-muted-foreground text-sm mt-1">Create a budget to start tracking your spending.</p>
+            </div>
+        </Empty>
       )}
     </div>
   );

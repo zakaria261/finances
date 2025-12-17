@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
 
 // Zod schema for validation
 const transactionSchema = z.object({
@@ -35,12 +36,12 @@ export async function createTransaction(formData: unknown) {
       data: {
         ...result.data,
         userId,
-        // Prisma expects frequency, even if we don't use it in the form yet
         frequency: "ONCE", 
       },
     });
+
+    await addXp("ADD_TRANSACTION");
     
-    // Revalidate paths to update UI
     revalidatePath("/dashboard");
     revalidatePath("/transactions");
 
