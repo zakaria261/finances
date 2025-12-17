@@ -507,18 +507,19 @@ export default function RegisterPage() {
 // FILE: app/(main)/budgets/page.tsx
 // ============================================================================
 
-// app/(main)/budgets/page.tsx (NEW FILE)
 import { getBudgetsWithSpending } from "@/lib/actions/budget.actions";
 import { AddBudgetDialog } from "@/components/budgets/add-budget-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
+import { Empty } from "@/components/ui/empty";
+import { Landmark } from "lucide-react";
 
 export default async function BudgetsPage() {
   const budgets = await getBudgetsWithSpending();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold leading-none tracking-tight">Budgets</h1>
         <AddBudgetDialog />
@@ -547,10 +548,13 @@ export default async function BudgetsPage() {
           ))}
         </div>
       ) : (
-        <Card className="flex flex-col items-center justify-center p-8">
-            <CardTitle>No Budgets Found</CardTitle>
-            <CardDescription className="mt-2">Create a budget to start tracking your spending.</CardDescription>
-        </Card>
+        <Empty>
+            <Landmark className="h-12 w-12 text-muted-foreground" />
+            <div className="text-center">
+                <h3 className="text-lg font-semibold">No Budgets Found</h3>
+                <p className="text-muted-foreground text-sm mt-1">Create a budget to start tracking your spending.</p>
+            </div>
+        </Empty>
       )}
     </div>
   );
@@ -560,8 +564,6 @@ export default async function BudgetsPage() {
 // FILE: app/(main)/dashboard/page.tsx
 // ============================================================================
 
-// app/(main)/dashboard/page.tsx
-
 import {
   Card,
   CardContent,
@@ -569,7 +571,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DollarSign, Landmark, PiggyBank, Scale } from "lucide-react";
+import { DollarSign, PiggyBank, Scale, TrendingUp, HandCoins } from "lucide-react";
 import { getTransactions } from "@/lib/actions/transaction.actions";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -577,46 +579,30 @@ import {
   endOfMonth,
   subMonths,
   format,
-  startOfYear,
 } from "date-fns";
 import { MonthlySummaryChart } from "@/components/dashboard/monthly-summary-chart";
 import { ExpenseByCategoryChart } from "@/components/dashboard/expense-by-category-chart";
+import { AiInsightsCard } from "@/components/dashboard/ai-insights-card";
+import { getDashboardStats } from "@/lib/actions/dashboard.actions";
+import { SeasonPassCard } from "@/components/gamification/season-pass-card";
+import { getGameState } from "@/lib/actions/gamification.actions";
 
 export default async function DashboardPage() {
-  const transactions = await getTransactions();
-
-  // --- Data for Stat Cards ---
-  const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-
-  const monthlyTransactions = transactions.filter(
-    (t) => t.date >= monthStart && t.date <= monthEnd
-  );
-
-  const monthlyIncome = monthlyTransactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const monthlyExpense = monthlyTransactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const cashFlow = monthlyIncome - monthlyExpense;
-
-  const totalFlow = transactions.reduce(
-    (sum, t) => sum + (t.type === "INCOME" ? t.amount : -t.amount),
-    0
-  );
+  const [transactions, stats, gameState] = await Promise.all([
+      getTransactions(),
+      getDashboardStats(),
+      getGameState(),
+  ]);
 
   // --- Data for Monthly Summary Bar Chart (Last 6 Months) ---
+  const now = new Date();
   const monthlySummaryData = Array.from({ length: 6 }).map((_, i) => {
     const date = subMonths(now, 5 - i);
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
 
     const monthTransactions = transactions.filter(
-      (t) => t.date >= monthStart && t.date <= monthEnd
+      (t) => new Date(t.date) >= monthStart && new Date(t.date) <= monthEnd
     );
 
     const income = monthTransactions
@@ -635,6 +621,12 @@ export default async function DashboardPage() {
   });
   
   // --- Data for Expense by Category Donut Chart (Current Month) ---
+   const currentMonthStart = startOfMonth(now);
+   const currentMonthEnd = endOfMonth(now);
+   const monthlyTransactions = transactions.filter(
+    (t) => new Date(t.date) >= currentMonthStart && new Date(t.date) <= currentMonthEnd
+  );
+  
   const expenseByCategory = monthlyTransactions
     .filter((t) => t.type === "EXPENSE")
     .reduce((acc, t) => {
@@ -665,18 +657,17 @@ export default async function DashboardPage() {
         Welcome Back!
       </h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Stat Cards remain the same */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Flow</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(totalFlow)}
+            <div className={`text-2xl font-bold`}>
+              {formatCurrency(stats.netWorth)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total income minus total expense
+              Total assets minus total debts
             </p>
           </CardContent>
         </Card>
@@ -688,8 +679,8 @@ export default async function DashboardPage() {
             <Scale className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-             <div className={`text-2xl font-bold ${cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-               {formatCurrency(cashFlow)}
+             <div className={`text-2xl font-bold ${stats.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+               {formatCurrency(stats.cashFlow)}
             </div>
             <p className="text-xs text-muted-foreground">
               This month&apos;s income vs. expenses
@@ -699,14 +690,14 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Financial Health
+              Total Savings
             </CardTitle>
             <PiggyBank className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">82/100</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalSavings)}</div>
             <p className="text-xs text-muted-foreground">
-              Based on AI analysis
+              Across all savings goals
             </p>
           </CardContent>
         </Card>
@@ -715,42 +706,100 @@ export default async function DashboardPage() {
             <CardTitle className="text-sm font-medium">
               Active Budgets
             </CardTitle>
-            <Landmark className="h-4 w-4 text-muted-foreground" />
+            <HandCoins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">{stats.budgets.count}</div>
             <p className="text-xs text-muted-foreground">
-              3 on track, 2 overspending
+              {stats.budgets.onTrack} on track, {stats.budgets.overspent} over
             </p>
           </CardContent>
         </Card>
       </div>
       
-      {/* Chart Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Summary</CardTitle>
-            <CardDescription>
-              Income vs. Expense for the last 6 months.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MonthlySummaryChart data={monthlySummaryData} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Expense Breakdown</CardTitle>
-            <CardDescription>
-              How your expenses are categorized this month.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ExpenseByCategoryChart data={expenseByCategoryData} />
-          </CardContent>
-        </Card>
+      {/* Chart & AI Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 grid gap-4">
+             <Card>
+              <CardHeader>
+                <CardTitle>Monthly Summary</CardTitle>
+                <CardDescription>
+                  Income vs. Expense for the last 6 months.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MonthlySummaryChart data={monthlySummaryData} />
+              </CardContent>
+            </Card>
+             <Card>
+              <CardHeader>
+                <CardTitle>Expense Breakdown</CardTitle>
+                <CardDescription>
+                  How your expenses are categorized this month.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ExpenseByCategoryChart data={expenseByCategoryData} />
+              </CardContent>
+            </Card>
+        </div>
+        <div className="space-y-4">
+            <AiInsightsCard />
+            <SeasonPassCard gameState={gameState} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/debts/page.tsx
+// ============================================================================
+
+
+// ============================================================================
+// FILE: app/(main)/debts/page.tsx
+// ============================================================================
+
+// app/(main)/debts/page.tsx (NEW FILE)
+import { getDebts } from "@/lib/actions/debt.actions";
+import { AddDebtDialog } from "@/components/debts/add-debt-dialog";
+import { DebtCard } from "@/components/debts/debt-card";
+import { DebtAiAnalysis } from "@/components/debts/debt-ai-analysis";
+import { Empty } from "@/components/ui/empty";
+import { CreditCard } from "lucide-react";
+
+export default async function DebtsPage() {
+  const debts = await getDebts();
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          Debt Management
+        </h1>
+        <AddDebtDialog />
+      </div>
+
+      {debts.length > 0 && <DebtAiAnalysis debts={debts} />}
+
+      {debts.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {debts.map((debt) => (
+            <DebtCard key={debt.id} debt={debt} />
+          ))}
+        </div>
+      ) : (
+        <Empty>
+          <CreditCard className="h-12 w-12 text-muted-foreground" />
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">No Debts Found</h3>
+            <p className="text-muted-foreground text-sm mt-1">
+              Track your loans and credit cards to get a clear repayment plan.
+            </p>
+          </div>
+        </Empty>
+      )}
     </div>
   );
 }
@@ -762,17 +811,15 @@ export default async function DashboardPage() {
 // ============================================================================
 // FILE: app/(main)/goals/page.tsx
 // ============================================================================
-
-import { getGoals } from "@/lib/actions/goal.actions";
-import { AddGoalDialog } from "@/components/goals/add-goal-dialog";
 import { GoalCard } from "@/components/goals/goal-card";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty";
+import { Target } from "lucide-react";
 
 export default async function GoalsPage() {
   const goals = await getGoals();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold leading-none tracking-tight">
           Financial Goals
@@ -787,14 +834,13 @@ export default async function GoalsPage() {
           ))}
         </div>
       ) : (
-        <Card className="flex flex-col items-center justify-center p-8 text-center">
-          <CardHeader>
-            <CardTitle>No Goals Yet</CardTitle>
-            <CardDescription>
-              Setting goals is the first step to financial freedom. Create your first goal today!
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <Empty>
+            <Target className="h-12 w-12 text-muted-foreground" />
+            <div className="text-center">
+                <h3 className="text-lg font-semibold">No Goals Yet</h3>
+                <p className="text-muted-foreground text-sm mt-1">Setting goals is the first step to financial freedom.</p>
+            </div>
+        </Empty>
       )}
     </div>
   );
@@ -901,25 +947,70 @@ export default async function MainLayout({
 }
 
 // ============================================================================
-// FILE: app/(main)/settings/page.tsx
+// FILE: app/(main)/patrimoine/page.tsx
 // ============================================================================
+
+// app/(main)/patrimoine/page.tsx (NEW FILE)
+import { getAssets } from "@/lib/actions/patrimoine.actions";
+import { AddAssetDialog } from "@/components/patrimoine/add-asset-dialog";
+import { AssetCard } from "@/components/patrimoine/asset-card";
+import { Empty } from "@/components/ui/empty";
+import { Home, PiggyBank } from "lucide-react";
+
+export default async function PatrimoinePage() {
+  const assets = await getAssets();
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          Patrimoine (Assets)
+        </h1>
+        <AddAssetDialog />
+      </div>
+
+      {assets.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {assets.map((asset) => (
+            <AssetCard key={asset.id} asset={asset} />
+          ))}
+        </div>
+      ) : (
+        <Empty>
+          <PiggyBank className="h-12 w-12 text-muted-foreground" />
+           <div className="text-center">
+                <h3 className="text-lg font-semibold">No Assets Tracked</h3>
+                <p className="text-muted-foreground text-sm mt-1">Add your assets to calculate your complete net worth.</p>
+            </div>
+        </Empty>
+      )}
+    </div>
+  );
+}
 
 // ============================================================================
 // FILE: app/(main)/settings/page.tsx
 // ============================================================================
+
+// app/(main)/settings/page.tsx
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { ProfileForm } from "@/components/settings/profile-form";
+import { PreferencesForm } from "@/components/settings/preferences-form";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   const user = session?.user;
+
+  if (!user) return null;
+
+  const userWithInitials = {
+      ...user,
+      initials: getInitials(user.name)
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
@@ -930,29 +1021,8 @@ export default async function SettingsPage() {
            <CardTitle>Profile</CardTitle>
            <CardDescription>Manage your public profile information.</CardDescription>
          </CardHeader>
-         <CardContent className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                    <AvatarImage src={user?.image || undefined} />
-                    <AvatarFallback className="text-lg">{getInitials(user?.name)}</AvatarFallback>
-                </Avatar>
-                <Button variant="outline">Change Avatar</Button>
-            </div>
-            
-            <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" defaultValue={user?.name || ""} />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" defaultValue={user?.email || ""} disabled className="bg-muted"/>
-                </div>
-            </div>
-            
-            <div className="flex justify-end">
-                <Button>Save Changes</Button>
-            </div>
+         <CardContent>
+            <ProfileForm user={userWithInitials} />
          </CardContent>
        </Card>
 
@@ -961,21 +1031,8 @@ export default async function SettingsPage() {
            <CardTitle>Preferences</CardTitle>
            <CardDescription>Customize your application experience.</CardDescription>
          </CardHeader>
-         <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                    <Label className="text-base">Marketing Emails</Label>
-                    <p className="text-sm text-muted-foreground">Receive emails about new features and tips.</p>
-                </div>
-                <Button variant="outline" size="sm">Enabled</Button>
-            </div>
-             <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                    <Label className="text-base">Currency</Label>
-                    <p className="text-sm text-muted-foreground">Select your preferred currency for display.</p>
-                </div>
-                <Button variant="outline" size="sm">USD ($)</Button>
-            </div>
+         <CardContent>
+            <PreferencesForm />
          </CardContent>
        </Card>
     </div>
@@ -1789,6 +1846,323 @@ export function MonthlySummaryChart({ data }: MonthlySummaryChartProps) {
       </ResponsiveContainer>
     </ChartContainer>
   );
+}
+
+// ============================================================================
+// FILE: components/debts/add-debt-dialog.tsx
+// ============================================================================
+
+// components/debts/add-debt-dialog.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PlusCircle } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import { createDebt } from "@/lib/actions/debt.actions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
+const formSchema = z.object({
+  name: z.string().min(1, "Debt name is required."),
+  type: z.enum(["LOAN", "CREDIT_CARD", "OTHER"]),
+  balance: z.coerce.number().positive("Balance must be a positive number."),
+  apr: z.coerce.number().min(0, "APR cannot be negative.").max(100, "APR seems too high."),
+  minPayment: z.coerce.number().positive("Minimum payment must be positive."),
+});
+
+export function AddDebtDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const result = await createDebt(values);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Debt</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Track a New Debt</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Debt Name</FormLabel>
+                <FormControl><Input placeholder="e.g., Chase Sapphire Card" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="type" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Debt Type</FormLabel>
+                 <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                      <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                      <SelectItem value="LOAN">Loan</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="balance" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Balance</FormLabel>
+                  <FormControl><Input type="number" placeholder="2500.00" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+               <FormField control={form.control} name="apr" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>APR (%)</FormLabel>
+                  <FormControl><Input type="number" placeholder="21.99" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+             <FormField control={form.control} name="minPayment" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Minimum Monthly Payment</FormLabel>
+                  <FormControl><Input type="number" placeholder="75.00" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Adding..." : "Add Debt"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/debts/debt-ai-analysis.tsx
+// ============================================================================
+
+// components/debts/debt-ai-analysis.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { Bot, Loader2, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { analyzeDebtRepayment } from "@/lib/actions/ai.actions";
+import { useToast } from "../ui/use-toast";
+
+type DebtAnalysisResult = {
+  bestMethod: 'AVALANCHE' | 'SNOWBALL';
+  reasoning: string;
+  avalanche: { payoffMonths: number, totalInterest: number };
+  snowball: { payoffMonths: number, totalInterest: number };
+};
+
+export function DebtAiAnalysis({ debts }: { debts: any[] }) {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<DebtAnalysisResult | null>(null);
+  const { toast } = useToast();
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setData(null);
+    try {
+      const result = await analyzeDebtRepayment(debts);
+       if (!result || !result.bestMethod) {
+        toast({ title: "Analysis Error", description: "The AI could not determine the best repayment strategy. Please try again.", variant: "destructive" });
+        return;
+      }
+      setData(result);
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "An unexpected error occurred during analysis.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-sky-500/20 bg-sky-50/10 dark:bg-sky-950/10">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+           <Bot className="h-5 w-5 text-sky-500" />
+           <CardTitle>AI Debt Repayment Coach</CardTitle>
+        </div>
+        <CardDescription>Analyze your debts to find the fastest way to become debt-free.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+            <p className="text-sm text-muted-foreground">Comparing strategies...</p>
+          </div>
+        ) : data ? (
+          <div className="space-y-4 text-sm">
+             <div className="p-3 bg-background/50 rounded-lg border">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Recommendation</p>
+                <p className="font-semibold text-sky-600 dark:text-sky-400">The best method for you is the <span className="capitalize">{data.bestMethod.toLowerCase()}</span> method.</p>
+                <p className="text-xs mt-1">{data.reasoning}</p>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                     <p className="font-semibold">Avalanche (High APR First)</p>
+                     <p>Payoff: ~{data.avalanche.payoffMonths} months</p>
+                     <p>Total Interest: ${data.avalanche.totalInterest.toFixed(2)}</p>
+                 </div>
+                  <div className="space-y-1">
+                     <p className="font-semibold">Snowball (Low Balance First)</p>
+                     <p>Payoff: ~{data.snowball.payoffMonths} months</p>
+                     <p>Total Interest: ${data.snowball.totalInterest.toFixed(2)}</p>
+                 </div>
+             </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-sm text-muted-foreground">
+            Get a personalized debt repayment plan.
+          </div>
+        )}
+      </CardContent>
+      <CardFooter>
+        <Button 
+            className="w-full bg-sky-600 hover:bg-sky-700 text-white" 
+            onClick={handleGenerate} 
+            disabled={loading}
+        >
+            {data ? <><RefreshCw className="mr-2 h-4 w-4"/> Re-analyze</> : "Analyze My Debts"}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+// ============================================================================
+// FILE: components/debts/debt-card.tsx
+// ============================================================================
+
+// components/debts/debt-card.tsx (NEW FILE)
+import type { Debt } from "@prisma/client";
+import {
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle
+} from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Trash2 } from "lucide-react";
+
+export function DebtCard({ debt }: { debt: Debt }) {
+    
+  const debtTypeMap = {
+      "CREDIT_CARD": "Credit Card",
+      "LOAN": "Loan",
+      "OTHER": "Other"
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+            <div>
+                <CardTitle>{debt.name}</CardTitle>
+                <CardDescription>
+                   <Badge variant="secondary" className="mt-1">{debtTypeMap[debt.type]}</Badge>
+                </CardDescription>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Trash2 className="h-4 w-4 text-destructive"/>
+            </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+            <p className="text-muted-foreground">Balance</p>
+            <p className="font-semibold">{formatCurrency(debt.balance)}</p>
+        </div>
+        <div>
+            <p className="text-muted-foreground">APR</p>
+            <p className="font-semibold">{debt.apr.toFixed(2)}%</p>
+        </div>
+        <div className="col-span-2">
+            <p className="text-muted-foreground">Minimum Payment</p>
+            <p className="font-semibold">{formatCurrency(debt.minPayment)} / month</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// FILE: components/gamification/season-pass-card.tsx
+// ============================================================================
+
+// components/gamification/season-pass-card.tsx (NEW FILE)
+"use client";
+
+import type { GameState } from "@prisma/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Trophy } from "lucide-react";
+import { siteConfig } from "@/lib/config";
+
+interface SeasonPassCardProps {
+    gameState: GameState | null;
+}
+
+export function SeasonPassCard({ gameState }: SeasonPassCardProps) {
+    if (!gameState) return null;
+
+    const { level, xp } = gameState;
+    const { xpToNextLevel, rewards } = siteConfig.gamification;
+    const currentLevelXp = xpToNextLevel[level - 1] || Infinity;
+    const progress = (xp / currentLevelXp) * 100;
+    const nextReward = rewards.find(r => r.level === level + 1);
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-amber-500" />
+                    <CardTitle>Season Pass</CardTitle>
+                </div>
+                <CardDescription>Level up by managing your finances.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <div className="flex justify-between items-baseline">
+                    <span className="text-lg font-bold">Level {level}</span>
+                    <span className="text-sm text-muted-foreground">{xp} / {currentLevelXp} XP</span>
+                </div>
+                <Progress value={progress} />
+                {nextReward && (
+                    <p className="text-xs text-center text-muted-foreground">
+                        Next Reward: {nextReward.name} at Level {nextReward.level}
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    )
 }
 
 // ============================================================================
@@ -2948,15 +3322,19 @@ import {
   Target,
   BarChart,
   Settings,
+  Home,
+  CreditCard,
 } from "lucide-react";
 import { getInitials } from "@/lib/utils"; 
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Wallet },
-  { href: "/budgets", label: "Budgets", icon: Landmark }, // This is already here
-  { href: "/goals", label: "Goals", icon: Target },     // This is already here
+  { href: "/budgets", label: "Budgets", icon: Landmark },
+  { href: "/goals", label: "Goals", icon: Target },
   { href: "/investments", label: "Investments", icon: BarChart },
+  { href: "/patrimoine", label: "Patrimoine", icon: Home },
+  { href: "/debts", label: "Debts", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -2973,7 +3351,6 @@ export function Sidebar({ user }: SidebarProps) {
         <Logo />
       </SidebarHeader>
       
-      {/* MODIFICATION: Added mt-8 to create space below the logo */}
       <SidebarContent className="mt-8">
         <SidebarMenu className="gap-y-2">
           {navItems.map((item) => (
@@ -3012,6 +3389,149 @@ export function Sidebar({ user }: SidebarProps) {
 }
 
 // ============================================================================
+// FILE: components/patrimoine/add-asset-dialog.tsx
+// ============================================================================
+
+// components/patrimoine/add-asset-dialog.tsx (NEW FILE)
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PlusCircle } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { createAsset } from "@/lib/actions/patrimoine.actions";
+
+const formSchema = z.object({
+  name: z.string().min(1, "Asset name is required."),
+  value: z.coerce.number().positive("Value must be a positive number."),
+  type: z.enum(["SAVINGS", "REAL_ESTATE", "OTHER"]),
+});
+
+export function AddAssetDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const result = await createAsset(values);
+    if (result.success) {
+      toast({ title: "Success", description: result.message });
+      form.reset();
+      setOpen(false);
+    } else {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button><PlusCircle className="mr-2 h-4 w-4" /> Add Asset</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Track a New Asset</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Asset Name</FormLabel>
+                <FormControl><Input placeholder="e.g., Main Savings Account" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="value" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Current Value</FormLabel>
+                <FormControl><Input type="number" placeholder="10000.00" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="type" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Asset Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="SAVINGS">Savings</SelectItem>
+                    <SelectItem value="REAL_ESTATE">Real Estate</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? "Adding..." : "Add Asset"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// FILE: components/patrimoine/asset-card.tsx
+// ============================================================================
+
+// components/patrimoine/asset-card.tsx (NEW FILE)
+import type { Asset } from "@prisma/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import { Home, PiggyBank, Package } from "lucide-react";
+import { Badge } from "../ui/badge";
+
+const assetIcons: { [key: string]: React.ReactNode } = {
+  SAVINGS: <PiggyBank className="h-6 w-6 text-primary" />,
+  REAL_ESTATE: <Home className="h-6 w-6 text-primary" />,
+  OTHER: <Package className="h-6 w-6 text-primary" />,
+};
+
+const assetTypeMap: { [key: string]: string } = {
+    SAVINGS: "Savings",
+    REAL_ESTATE: "Real Estate",
+    OTHER: "Other"
+}
+
+export function AssetCard({ asset }: { asset: Asset }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-4">
+          <div className="bg-primary/10 p-2 rounded-lg">
+            {assetIcons[asset.type] || assetIcons.OTHER}
+          </div>
+          <div>
+            <CardTitle>{asset.name}</CardTitle>
+            <CardDescription>
+                <Badge variant="outline" className="mt-1">{assetTypeMap[asset.type]}</Badge>
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold">{formatCurrency(asset.value)}</p>
+        <p className="text-xs text-muted-foreground">Current Value</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
 // FILE: components/providers.tsx
 // ============================================================================
 
@@ -3028,6 +3548,152 @@ export function Providers({ children, ...props }: ThemeProviderProps) {
     <SessionProvider>
       <NextThemesProvider {...props}>{children}</NextThemesProvider>
     </SessionProvider>
+  );
+}
+
+// ============================================================================
+// FILE: components/settings/preferences-form.tsx
+// ============================================================================
+
+// components/settings/preferences-form.tsx (NEW FILE)
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+
+export function PreferencesForm() {
+    // This would be backed by state and server actions in a real app
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between rounded-lg border p-4">
+        <div className="space-y-0.5">
+          <Label className="text-base">Marketing Emails</Label>
+          <p className="text-sm text-muted-foreground">
+            Receive emails about new features and tips.
+          </p>
+        </div>
+        <Switch defaultChecked />
+      </div>
+      <div className="flex items-center justify-between rounded-lg border p-4">
+        <div className="space-y-0.5">
+          <Label className="text-base">Currency</Label>
+          <p className="text-sm text-muted-foreground">
+            Select your preferred currency for display.
+          </p>
+        </div>
+        <Button variant="outline" size="sm">
+          USD ($)
+        </Button>
+      </div>
+      <div className="flex justify-end">
+          <Button>Save Preferences</Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FILE: components/settings/profile-form.tsx
+// ============================================================================
+
+// components/settings/profile-form.tsx (NEW FILE)
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { updateUserProfile } from "@/lib/actions/user.actions";
+import { useToast } from "../ui/use-toast";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
+
+const formSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
+});
+
+interface ProfileFormProps {
+    user: {
+        id: string;
+        name?: string | null;
+        email?: string | null;
+        image?: string | null;
+        initials: string;
+    }
+}
+
+export function ProfileForm({ user }: ProfileFormProps) {
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            name: user.name || "",
+        },
+    });
+
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        setIsLoading(true);
+        const result = await updateUserProfile(values);
+        if (result.success) {
+            toast({ title: "Success", description: "Profile updated successfully." });
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
+        setIsLoading(false);
+    }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-20 w-20">
+            <AvatarImage src={user?.image || undefined} />
+            <AvatarFallback className="text-lg">{user.initials}</AvatarFallback>
+          </Avatar>
+          <Button variant="outline" type="button">Change Avatar</Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                            <Input id="name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+          <div className="space-y-2">
+            <FormLabel htmlFor="email">Email</FormLabel>
+            <Input id="email" defaultValue={user?.email || ""} disabled className="bg-muted" />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+            Save Changes
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }
 
@@ -10218,36 +10884,66 @@ export function useIsMobile() {
 // FILE: lib/actions/ai.actions.ts
 // ============================================================================
 
-// ============================================================================
-// FILE: lib/actions/ai.actions.ts
-// ============================================================================
+// lib/actions/ai.actions.ts
 
 "use server";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "../prisma";
+import { runFinancialAnalysis, runDebtAnalysis } from "../google-gemini-ai";
+import { format } from "date-fns";
 
+// This is the main AI analysis for the dashboard
 export async function generateFinancialInsights() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
 
-  // In a real implementation, you would:
-  // 1. Fetch user transactions/budgets/goals from Prisma.
-  // 2. Format a prompt for the Gemini API.
-  // 3. Call the Gemini API.
-  
-  // MOCK RESPONSE
-  await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate latency
+  try {
+    const [transactions, goals, budgets, assets, debts] = await Promise.all([
+      prisma.transaction.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 100 }),
+      prisma.goal.findMany({ where: { userId } }),
+      prisma.budget.findMany({ where: { userId } }),
+      prisma.asset.findMany({ where: { userId } }),
+      prisma.debt.findMany({ where: { userId } })
+    ]);
 
-  return {
-    score: 78,
-    summary: "Your financial health is stable. You are consistently saving, but your dining out expenses have increased by 15% compared to last month.",
-    recommendations: [
-      "Consider reducing 'Entertainment' spending to reach your 'Vacation Fund' goal faster.",
-      "You have surplus cash flow this month; consider moving $200 into your investment portfolio.",
-      "Review your recurring subscriptions; 2 services haven't been used in 30 days."
-    ]
-  };
+    const financialData = {
+      transactions: transactions.map(t => ({...t, date: format(t.date, 'yyyy-MM-dd')})),
+      goals,
+      budgets,
+      assets,
+      debts
+    };
+
+    const analysisResult = await runFinancialAnalysis(financialData);
+    
+    // The Gemini function returns a JSON string, so we parse it.
+    const parsedResult = JSON.parse(analysisResult);
+    
+    return parsedResult;
+
+  } catch (error) {
+    console.error("GEMINI_FINANCIAL_ANALYSIS_ERROR", error);
+    // Return a structured error so the frontend can handle it
+    return { error: "Failed to generate AI insights. Please try again later." };
+  }
+}
+
+// This is the AI analysis for the debts page
+export async function analyzeDebtRepayment(debts: any[]) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    try {
+        const analysisResult = await runDebtAnalysis(debts);
+        const parsedResult = JSON.parse(analysisResult);
+        return parsedResult;
+    } catch (error) {
+        console.error("GEMINI_DEBT_ANALYSIS_ERROR", error);
+        return { error: "Failed to generate debt analysis." };
+    }
 }
 
 // ============================================================================
@@ -10340,10 +11036,199 @@ export async function getBudgetsWithSpending() {
 }
 
 // ============================================================================
+// FILE: lib/actions/dashboard.actions.ts
+// ============================================================================
+
+// lib/actions/dashboard.actions.ts (NEW FILE)
+"use server";
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { startOfMonth, endOfMonth } from "date-fns";
+import { getBudgetsWithSpending } from "./budget.actions";
+
+export async function getDashboardStats() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("Authentication required.");
+  }
+  const userId = session.user.id;
+
+  // --- Net Worth Calculation ---
+  const { _sum: { value: totalAssets } } = await prisma.asset.aggregate({
+    _sum: { value: true },
+    where: { userId },
+  });
+  const { _sum: { balance: totalDebts } } = await prisma.debt.aggregate({
+    _sum: { balance: true },
+    where: { userId },
+  });
+  const netWorth = (totalAssets ?? 0) - (totalDebts ?? 0);
+
+  // --- Monthly Cash Flow ---
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+  
+  const { _sum: { amount: monthlyIncome } } = await prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { userId, type: 'INCOME', date: { gte: monthStart, lte: monthEnd } },
+  });
+   const { _sum: { amount: monthlyExpense } } = await prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: { userId, type: 'EXPENSE', date: { gte: monthStart, lte: monthEnd } },
+  });
+  const cashFlow = (monthlyIncome ?? 0) - (monthlyExpense ?? 0);
+
+  // --- Total Savings ---
+  const { _sum: { currentAmount: totalSavings } } = await prisma.goal.aggregate({
+      _sum: { currentAmount: true },
+      where: { userId }
+  });
+
+  // --- Budgets Status ---
+  const budgets = await getBudgetsWithSpending();
+  const budgetsOnTrack = budgets.filter(b => b.progress <= 100).length;
+  const budgetsOverspent = budgets.length - budgetsOnTrack;
+  
+  return {
+    netWorth,
+    cashFlow,
+    totalSavings: totalSavings ?? 0,
+    budgets: {
+        count: budgets.length,
+        onTrack: budgetsOnTrack,
+        overspent: budgetsOverspent,
+    }
+  };
+}
+
+// ============================================================================
+// FILE: lib/actions/debt.actions.ts
+// ============================================================================
+
+// lib/actions/debt.actions.ts (NEW FILE)
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
+
+const debtSchema = z.object({
+  name: z.string().min(1, "Debt name is required."),
+  type: z.enum(["LOAN", "CREDIT_CARD", "OTHER"]),
+  balance: z.coerce.number().positive("Balance must be a positive number."),
+  apr: z.coerce.number().min(0, "APR cannot be negative."),
+  minPayment: z.coerce.number().positive("Minimum payment must be positive."),
+});
+
+export async function createDebt(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = debtSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  try {
+    await prisma.debt.create({
+      data: { ...result.data, userId },
+    });
+    
+    await addXp("ADD_DEBT");
+
+    revalidatePath("/debts");
+    revalidatePath("/dashboard");
+    return { success: true, message: "Debt added successfully." };
+  } catch (error) {
+    console.error("CREATE_DEBT_ERROR", error);
+    return { success: false, message: "Failed to add debt." };
+  }
+}
+
+export async function getDebts() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Authentication required.");
+
+  return await prisma.debt.findMany({
+    where: { userId: session.user.id },
+    orderBy: { balance: "desc" },
+  });
+}
+
+// ============================================================================
+// FILE: lib/actions/gamification.actions.ts
+// ============================================================================
+
+// lib/actions/gamification.actions.ts (NEW FILE)
+"use server";
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { siteConfig } from "../config";
+
+export async function getGameState() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return null;
+    const userId = session.user.id;
+
+    let gameState = await prisma.gameState.findUnique({
+        where: { userId },
+    });
+
+    if (!gameState) {
+        gameState = await prisma.gameState.create({
+            data: { userId }
+        });
+    }
+
+    return gameState;
+}
+
+type XpEvent = "ADD_TRANSACTION" | "ADD_GOAL" | "FUND_GOAL" | "ADD_BUDGET" | "ADD_INVESTMENT" | "ADD_ASSET" | "ADD_DEBT";
+
+export async function addXp(event: XpEvent) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return;
+    const userId = session.user.id;
+    
+    const xpAmount = siteConfig.gamification.xpEvents[event] || 0;
+    if (xpAmount === 0) return;
+
+    const gameState = await getGameState();
+    if (!gameState) return;
+
+    let { xp, level } = gameState;
+    xp += xpAmount;
+
+    // Check for level up
+    let xpToNextLevel = siteConfig.gamification.xpToNextLevel[level - 1];
+    while (xpToNextLevel && xp >= xpToNextLevel) {
+        level++;
+        xp -= xpToNextLevel;
+        xpToNextLevel = siteConfig.gamification.xpToNextLevel[level - 1];
+    }
+
+    await prisma.gameState.update({
+        where: { userId },
+        data: { xp, level },
+    });
+}
+
+// ============================================================================
 // FILE: lib/actions/goal.actions.ts
 // ============================================================================
 
-// lib/actions/goal.actions.ts (NEW FILE)
+// lib/actions/goal.actions.ts
 
 "use server";
 
@@ -10352,6 +11237,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
 
 // Zod schema for creating a goal
 const goalSchema = z.object({
@@ -10383,6 +11269,9 @@ export async function createGoal(formData: unknown) {
     await prisma.goal.create({
       data: { ...result.data, userId },
     });
+
+    await addXp("ADD_GOAL");
+
     revalidatePath("/goals");
     return { success: true, message: "Goal created successfully." };
   } catch (error) {
@@ -10414,6 +11303,9 @@ export async function addFundsToGoal(formData: unknown) {
     const { goalId, amount } = result.data;
 
     try {
+        const goal = await prisma.goal.findUnique({ where: {id: goalId}});
+        if(!goal) return { success: false, message: "Goal not found." };
+
         // Use a transaction to ensure both operations succeed or fail together
         await prisma.$transaction([
             prisma.goal.update({
@@ -10422,7 +11314,7 @@ export async function addFundsToGoal(formData: unknown) {
             }),
             prisma.transaction.create({
                 data: {
-                    name: `Contribution to Goal`,
+                    name: `Contribution to "${goal.name}"`,
                     amount: amount,
                     type: "EXPENSE",
                     category: "Savings", // A dedicated category for goal contributions
@@ -10432,6 +11324,8 @@ export async function addFundsToGoal(formData: unknown) {
                 },
             }),
         ]);
+
+        await addXp("FUND_GOAL");
 
         revalidatePath("/goals");
         revalidatePath("/dashboard");
@@ -10526,6 +11420,61 @@ export async function deleteInvestment(id: string) {
 }
 
 // ============================================================================
+// FILE: lib/actions/patrimoine.actions.ts
+// ============================================================================
+
+// lib/actions/patrimoine.actions.ts (NEW FILE)
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
+
+const assetSchema = z.object({
+  name: z.string().min(1, "Asset name is required."),
+  value: z.coerce.number().positive("Value must be a positive number."),
+  type: z.enum(["SAVINGS", "REAL_ESTATE", "OTHER"]),
+});
+
+export async function createAsset(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = assetSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid form data." };
+  }
+
+  try {
+    await prisma.asset.create({
+      data: { ...result.data, userId },
+    });
+
+    await addXp("ADD_ASSET");
+
+    revalidatePath("/patrimoine");
+    revalidatePath("/dashboard");
+    return { success: true, message: "Asset added successfully." };
+  } catch (error) {
+    console.error("CREATE_ASSET_ERROR", error);
+    return { success: false, message: "Failed to add asset." };
+  }
+}
+
+export async function getAssets() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) throw new Error("Authentication required.");
+
+    return await prisma.asset.findMany({ where: { userId: session.user.id } });
+}
+
+// ============================================================================
 // FILE: lib/actions/transaction.actions.ts
 // ============================================================================
 
@@ -10538,6 +11487,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { addXp } from "./gamification.actions";
 
 // Zod schema for validation
 const transactionSchema = z.object({
@@ -10566,12 +11516,12 @@ export async function createTransaction(formData: unknown) {
       data: {
         ...result.data,
         userId,
-        // Prisma expects frequency, even if we don't use it in the form yet
         frequency: "ONCE", 
       },
     });
+
+    await addXp("ADD_TRANSACTION");
     
-    // Revalidate paths to update UI
     revalidatePath("/dashboard");
     revalidatePath("/transactions");
 
@@ -10599,6 +11549,49 @@ export async function getTransactions() {
 }
 
 // ============================================================================
+// FILE: lib/actions/user.actions.ts
+// ============================================================================
+
+// lib/actions/user.actions.ts (NEW FILE)
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+
+const profileSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
+});
+
+export async function updateUserProfile(formData: unknown) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, message: "Authentication required." };
+  }
+  const userId = session.user.id;
+
+  const result = profileSchema.safeParse(formData);
+  if (!result.success) {
+    return { success: false, message: "Invalid data provided." };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { name: result.data.name },
+    });
+
+    revalidatePath("/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("UPDATE_PROFILE_ERROR", error);
+    return { success: false, message: "Failed to update profile." };
+  }
+}
+
+// ============================================================================
 // FILE: lib/config.ts
 // ============================================================================
 
@@ -10611,7 +11604,105 @@ export const siteConfig = {
     { id: "pricing", name: "Pricing", href: "#pricing" },
     { id: "about", name: "About", href: "#about" },
   ],
+  gamification: {
+    xpEvents: {
+        "ADD_TRANSACTION": 10,
+        "ADD_GOAL": 25,
+        "FUND_GOAL": 15,
+        "ADD_BUDGET": 20,
+        "ADD_INVESTMENT": 20,
+        "ADD_ASSET": 15,
+        "ADD_DEBT": 15,
+    },
+    // Cumulative XP to reach the next level (index 0 is for level 2)
+    xpToNextLevel: [100, 150, 200, 250, 300, 400, 500],
+    rewards: [
+        { level: 2, name: "Advanced Charts"},
+        { level: 3, name: "New Theme"},
+        { level: 5, name: "CSV Export"},
+    ]
+  }
 };
+
+// ============================================================================
+// FILE: lib/google-gemini-ai.ts
+// ============================================================================
+
+// lib/google-gemini-ai.ts (NEW FILE)
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY environment variable is not set.");
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: { responseMimeType: "application/json" }
+});
+
+export async function runFinancialAnalysis(financialData: any) {
+  const prompt = `
+    You are an expert financial analyst. Analyze the following financial data for a user and provide a concise, insightful report.
+
+    Financial Data:
+    ${JSON.stringify(financialData, null, 2)}
+
+    Your task is to return a JSON object with the following structure:
+    {
+      "score": <A financial health score from 0-100, where 100 is excellent. Base this on savings rate, debt-to-asset ratio, and spending habits>,
+      "summary": "<A 1-2 sentence summary of the user's overall financial health>",
+      "strengths": ["<A key financial strength>", "<Another strength>"],
+      "weaknesses": ["<A key financial weakness>", "<Another weakness>"],
+      "recommendations": [
+        "<A specific, actionable recommendation to improve their finances>",
+        "<Another actionable recommendation>",
+        "<A third actionable recommendation>"
+      ]
+    }
+
+    Keep your analysis brief and to the point. The user wants actionable advice. Do not include any introductory text like "Here is the analysis". Just return the JSON object.
+  `;
+
+  const result = await model.generateContent(prompt);
+  const response = result.response;
+  return response.text();
+}
+
+
+export async function runDebtAnalysis(debts: any[]) {
+    const prompt = `
+    You are a debt repayment specialist. Analyze the user's debts and recommend the best repayment strategy (Avalanche or Snowball).
+    Assume the user can pay an extra $200 per month towards their debts on top of all minimum payments.
+
+    Debts Data:
+    ${JSON.stringify(debts, null, 2)}
+
+    Simulate both the Avalanche (paying off highest APR first) and Snowball (paying off lowest balance first) methods.
+    
+    Return a JSON object with the following structure:
+    {
+        "bestMethod": "<'AVALANCHE' or 'SNOWBALL'>",
+        "reasoning": "<A brief explanation of why this method is recommended for this user's specific situation>",
+        "avalanche": {
+            "payoffMonths": <estimated months to be debt free>,
+            "totalInterest": <estimated total interest paid>
+        },
+        "snowball": {
+            "payoffMonths": <estimated months to be debt free>,
+            "totalInterest": <estimated total interest paid>
+        }
+    }
+
+    Base your calculations on the provided data and the $200 extra payment. Be realistic. For payoff months, round to the nearest whole number.
+    Just return the JSON object.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    return response.text();
+}
 
 // ============================================================================
 // FILE: lib/prisma.ts
@@ -10701,6 +11792,7 @@ export default nextConfig;
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@next-auth/prisma-adapter": "^1.0.7",
     "@prisma/client": "^6.19.0",
@@ -10788,6 +11880,8 @@ export default config;
 // FILE: prisma.config.ts
 // ============================================================================
 
+// prisma.config.ts
+
 import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
@@ -10797,10 +11891,9 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: env("DATABASE_URL"), // This tells Prisma how to get the URL
   },
 });
-
 
 // ============================================================================
 // FILE: prisma/schema.prisma
@@ -10809,7 +11902,7 @@ export default defineConfig({
 // prisma/schema.prisma
 
 generator client {
-  provider        = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -10823,12 +11916,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.String
+  access_token      String? @db.String
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.String
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -10870,6 +11963,7 @@ model User {
   assets       Asset[]
   investments  Investment[]
   budgets      Budget[]
+  debts        Debt[]
   gameState    GameState?
 }
 
@@ -10931,6 +12025,19 @@ model Budget {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Debt {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  name        String
+  balance     Float
+  apr         Float
+  minPayment  Float
+  type        String // LOAN, CREDIT_CARD, OTHER
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GameState {
@@ -11030,6 +12137,6 @@ declare module "next-auth" {
 // ============================================================================
 // END OF CONTEXT
 // ============================================================================
-// Total files included: 114
-// Generated: Mon Dec  8 15:34:20 CET 2025
+// Total files included: 130
+// Generated: Wed Dec 17 14:26:21 CET 2025
 // ============================================================================
