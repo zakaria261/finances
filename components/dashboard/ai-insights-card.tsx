@@ -1,6 +1,4 @@
-// ============================================================================
-// FILE: components/dashboard/ai-insights-card.tsx
-// ============================================================================
+// components/dashboard/ai-insights-card.tsx
 
 "use client";
 
@@ -10,14 +8,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { generateFinancialInsights } from "@/lib/actions/ai.actions";
 
+// Define the expected type
+type InsightsData = {
+  score: number;
+  summary: string;
+  recommendations?: string[]; // Make optional
+};
+
 export function AiInsightsCard() {
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<{score: number; summary: string; recommendations: string[]} | null>(null);
+  const [data, setData] = useState<InsightsData | null>(null);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
       const result = await generateFinancialInsights();
+      if (result.error) {
+        // Handle error gracefully (could use toast here)
+        console.error(result.error);
+        return;
+      }
       setData(result);
     } catch (error) {
       console.error(error);
@@ -45,15 +55,20 @@ export function AiInsightsCard() {
           <div className="space-y-4">
              <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border">
                 <span className="text-sm font-medium">Financial Health Score</span>
-                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score}/100</span>
+                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score ?? 0}/100</span>
              </div>
              <p className="text-sm">{data.summary}</p>
              <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">Recommendations</p>
                 <ul className="text-sm space-y-1 list-disc pl-4">
-                    {data.recommendations.map((rec, i) => (
-                        <li key={i}>{rec}</li>
-                    ))}
+                    {/* SAFE GUARD: Check if recommendations exists before mapping */}
+                    {data.recommendations && data.recommendations.length > 0 ? (
+                        data.recommendations.map((rec, i) => (
+                            <li key={i}>{rec}</li>
+                        ))
+                    ) : (
+                        <li>No specific recommendations available.</li>
+                    )}
                 </ul>
              </div>
           </div>

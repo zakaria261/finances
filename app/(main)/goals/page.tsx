@@ -1,6 +1,6 @@
-// ============================================================================
-// FILE: app/(main)/goals/page.tsx
-// ============================================================================
+// app/(main)/goals/page.tsx
+import { getGoals } from "@/lib/actions/goal.actions";
+import { AddGoalDialog } from "@/components/goals/add-goal-dialog";
 import { GoalCard } from "@/components/goals/goal-card";
 import { Empty } from "@/components/ui/empty";
 import { Target } from "lucide-react";
@@ -11,7 +11,7 @@ export default async function GoalsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+        <h1 className="text-2xl font-semibold leading-none tracking-tight font-roboto">
           Financial Goals
         </h1>
         <AddGoalDialog />
@@ -27,8 +27,10 @@ export default async function GoalsPage() {
         <Empty>
             <Target className="h-12 w-12 text-muted-foreground" />
             <div className="text-center">
-                <h3 className="text-lg font-semibold">No Goals Yet</h3>
-                <p className="text-muted-foreground text-sm mt-1">Setting goals is the first step to financial freedom.</p>
+                <h3 className="text-lg font-semibold font-roboto">No Goals Yet</h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Setting goals is the first step to financial freedom.
+                </p>
             </div>
         </Empty>
       )}

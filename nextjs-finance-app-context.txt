@@ -11907,6 +11907,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
+  url = env("DATABASE_URL") 
 }
 
 // NextAuth Models
@@ -12138,5 +12139,5 @@ declare module "next-auth" {
 // END OF CONTEXT
 // ============================================================================
 // Total files included: 130
-// Generated: Wed Dec 17 14:26:21 CET 2025
+// Generated: Wed Dec 17 16:42:58 CET 2025
 // ============================================================================
