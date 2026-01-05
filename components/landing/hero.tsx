@@ -1,4 +1,3 @@
-// components/landing/hero.tsx
 "use client"
 
 import * as React from "react"
@@ -6,8 +5,10 @@ import Image from "next/image"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Mockup, MockupFrame } from "@/components/ui/mockup"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
+// @ts-ignore
 interface HeroProps extends React.HTMLAttributes<HTMLDivElement> {
   title: React.ReactNode
   subtitle?: string
@@ -27,65 +28,67 @@ const Hero = React.forwardRef<HTMLDivElement, HeroProps>(
     return (
       <section
         ref={ref}
-        className={cn("flex flex-col items-center bg-secondary/30", className)}
+        className={cn("relative flex flex-col items-center justify-center overflow-hidden pt-24 pb-16 md:pt-32 md:pb-24", className)}
         {...props}
       >
-        <div className="container text-center pt-20 pb-16">
+        {/* Background Effects */}
+        <div className="absolute inset-0 -z-10 h-full w-full bg-background [background:radial-gradient(125%_125%_at_50%_10%,#000_40%,#6366f1_100%)] opacity-5 dark:opacity-20" />
+        <div className="absolute inset-0 -z-10 h-full w-full bg-grid-pattern text-slate-950/5 dark:text-slate-50/5 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+        
+        {/* Top Glow */}
+        <div className="absolute top-0 z-0 h-[500px] w-[500px] -translate-y-[20%] rounded-full bg-indigo-500/20 blur-[100px] dark:bg-indigo-500/10" />
+
+        <div className="container relative z-10 text-center px-4">
             {eyebrow && (
-            <p 
-                className="font-instrument-sans uppercase tracking-[0.51em] leading-[133%] text-center text-sm md:text-base mb-8 text-foreground animate-appear opacity-0"
-            >
+            <div className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-800 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 animate-appear opacity-0 mb-8">
+                <Sparkles className="mr-2 h-3.5 w-3.5" />
                 {eyebrow}
-            </p>
+            </div>
             )}
 
-            <h1 
-            className="text-4xl md:text-6xl font-semibold leading-tight text-center text-foreground animate-appear opacity-0 [animation-delay:100ms]"
-            >
-            {title}
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight text-foreground animate-appear opacity-0 [animation-delay:100ms] leading-[1.1]">
+              <span className="block">Maîtrisez votre</span>
+              <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                Avenir Financier
+              </span>
             </h1>
 
             {subtitle && (
-            <p 
-                className="text-lg md:text-xl max-w-3xl mx-auto text-center font-instrument-sans font-light mt-6 mb-8 leading-relaxed text-muted-foreground animate-appear opacity-0 [animation-delay:300ms]"
-            >
+            <p className="mt-6 max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground animate-appear opacity-0 [animation-delay:300ms] leading-relaxed">
                 {subtitle}
             </p>
             )}
 
             {ctaText && ctaLink && (
-            <Link href={ctaLink}>
-                <div 
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 h-12 text-lg font-medium text-primary-foreground transition-colors hover:bg-primary/90 animate-appear opacity-0 [animation-delay:500ms]"
-                >
-                <span>{ctaText}</span>
-                <ArrowRight className="h-5 w-5" />
-                </div>
-            </Link>
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 animate-appear opacity-0 [animation-delay:500ms]">
+                <Button asChild size="lg" className="h-12 px-8 text-base rounded-full bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25">
+                    <Link href={ctaLink}>
+                        {ctaText} <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base rounded-full">
+                    <Link href="#features">En savoir plus</Link>
+                </Button>
+            </div>
             )}
         </div>
 
         {mockupImage && (
-          <div className="mt-12 w-full relative animate-appear opacity-0 [animation-delay:700ms]">
-            <MockupFrame>
-              <Mockup type="responsive">
-                <Image
-                  src={mockupImage.src}
-                  alt={mockupImage.alt}
-                  width={mockupImage.width}
-                  height={mockupImage.height}
-                  className="w-full h-auto"
-                  priority
-                />
-              </Mockup>
-            </MockupFrame>
-            <div
-              className="absolute bottom-0 left-0 right-0 w-full h-[303px]"
-              style={{
-                background: "linear-gradient(to top, oklch(from var(--secondary) l c h / 30%) 0%, oklch(from var(--secondary) l c h / 0%) 100%)",
-                zIndex: 10,
-              }}
-            />
+          <div className="mt-16 w-full max-w-5xl px-4 relative animate-appear opacity-0 [animation-delay:700ms]">
+            <div className="relative rounded-xl border bg-background/50 backdrop-blur shadow-2xl lg:rounded-2xl ring-1 ring-inset ring-foreground/10 p-2 md:p-4">
+                <div className="rounded-lg overflow-hidden border shadow-sm bg-background">
+                    <Image
+                        src={mockupImage.src}
+                        alt={mockupImage.alt}
+                        width={mockupImage.width}
+                        height={mockupImage.height}
+                        className="w-full h-auto object-cover"
+                        priority
+                    />
+                </div>
+            </div>
+            {/* Glow behind mockup */}
+            <div className="absolute -inset-4 -z-10 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-20 blur-2xl rounded-[3rem]" />
           </div>
         )}
       </section>

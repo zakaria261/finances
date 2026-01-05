@@ -15,24 +15,50 @@ export async function generateFinancialInsights() {
   const userId = session.user.id;
 
   try {
+    // 1. Fetch Data (Optimized: only grab what is needed)
     const [transactions, goals, budgets, assets, debts] = await Promise.all([
-      prisma.transaction.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 100 }),
-      prisma.goal.findMany({ where: { userId } }),
+      prisma.transaction.findMany({ 
+        where: { userId }, 
+        orderBy: { date: 'desc' }, 
+        take: 100,
+        select: { date: true, amount: true, category: true, type: true, name: true } 
+      }),
+      prisma.goal.findMany({ where: { userId }, select: { name: true, targetAmount: true, currentAmount: true } }),
       prisma.budget.findMany({ where: { userId } }),
       prisma.asset.findMany({ where: { userId } }),
       prisma.debt.findMany({ where: { userId } })
     ]);
 
+    // 2. Pre-calculate Summary Stats to help the AI (Reduces hallucination risk)
+    const totalIncome = transactions
+        .filter(t => t.type === 'INCOME')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = transactions
+        .filter(t => t.type === 'EXPENSE')
+        .reduce((sum, t) => sum + t.amount, 0);
+
     const financialData = {
-      transactions: transactions.map(t => ({...t, date: format(t.date, 'yyyy-MM-dd')})),
+      summaryStats: {
+        totalIncome,
+        totalExpenses,
+        netCashFlow: totalIncome - totalExpenses,
+        transactionCount: transactions.length
+      },
+      recentTransactions: transactions.map(t => ({
+        ...t, 
+        date: format(t.date, 'yyyy-MM-dd')
+      })),
       goals,
       budgets,
       assets,
       debts
     };
 
+    // 3. Call AI
     const analysisResult = await runFinancialAnalysis(financialData);
     
+    // 4. Parse & Return
     // The Gemini function returns a JSON string, so we parse it.
     const parsedResult = JSON.parse(analysisResult);
     

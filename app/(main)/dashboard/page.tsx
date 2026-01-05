@@ -1,3 +1,5 @@
+// app/(main)/dashboard/page.tsx
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -8,13 +10,12 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Wallet, Target, Flame, Star, Trophy, 
-  Sparkles, ChevronRight, PiggyBank, AlertTriangle, AlertCircle, 
+  Sparkles, PiggyBank, AlertTriangle, AlertCircle, 
   FileDown, Lock 
 } from 'lucide-react';
 
 import { formaterMontant, calculerMontantMensuel } from '@/utils/financeCalculations';
 import { CATEGORIES } from '@/constants';
-import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useFinanceData } from '@/context/FinanceDataContext';
+import { AiInsightsCard } from '@/components/dashboard/ai-insights-card'; // IMPORT THIS
 
 interface StatCardProps {
   label: string;
@@ -68,8 +70,6 @@ export default function DashboardPage() {
     objectifs,
     actifs,
     tropheesDeverrouilles,
-    analyserAvecIA,
-    chargementIA,
     budgets,
     setBudgets,
     gameState
@@ -228,51 +228,63 @@ export default function DashboardPage() {
         <StatCard label="Objectifs" value={objectifs.length.toString()} icon={Target} gradient="from-purple-500 to-pink-500" bg="from-purple-50 to-pink-50" count="En cours" />
       </div>
 
-      {/* Charts Section */}
-      {(depenses.length > 0 || revenus.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Répartition</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {donneesParCategorie.length > 0 ? (
+      {/* AI & Charts Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* The New AI Insights Card */}
+        <AiInsightsCard />
+
+        {/* Charts Section */}
+        {(depenses.length > 0 || revenus.length > 0) ? (
+          <div className="space-y-6">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Répartition des dépenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {donneesParCategorie.length > 0 ? (
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={donneesParCategorie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {donneesParCategorie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [formaterMontant(value), "Montant"]} contentStyle={tooltipStyle} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : <div className="h-[250px] flex items-center justify-center text-slate-400">Aucune donnée</div>}
+              </CardContent>
+            </Card>
+
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Aperçu Mensuel</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={donneesParCategorie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                        {donneesParCategorie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => [formaterMontant(value), "Montant"]} contentStyle={tooltipStyle} />
-                    </PieChart>
+                    <BarChart data={donneesRevenuDepenses} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
+                      <XAxis dataKey="categorie" stroke={currentTheme.colors.chartText} tick={{fontSize: 12}} axisLine={false} tickLine={false} />
+                      <YAxis stroke={currentTheme.colors.chartText} tickFormatter={(value) => `${value}€`} tick={{fontSize: 12}} axisLine={false} tickLine={false}/>
+                      <Tooltip formatter={(value: number) => formaterMontant(value)} cursor={{fill: currentTheme.isDark ? '#1e293b' : '#f8fafc'}} contentStyle={tooltipStyle} />
+                      <Bar dataKey="montant" radius={[6, 6, 0, 0]}>
+                        {donneesRevenuDepenses.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <div className="h-[250px] flex items-center justify-center text-slate-400">Aucune donnée</div>}
-            </CardContent>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="flex items-center justify-center min-h-[300px]">
+             <div className="text-center text-muted-foreground">
+                Add transactions to see charts.
+             </div>
           </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Aperçu Mensuel</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={donneesRevenuDepenses} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
-                    <XAxis dataKey="categorie" stroke={currentTheme.colors.chartText} tick={{fontSize: 12}} axisLine={false} tickLine={false} />
-                    <YAxis stroke={currentTheme.colors.chartText} tickFormatter={(value) => `${value}€`} tick={{fontSize: 12}} axisLine={false} tickLine={false}/>
-                    <Tooltip formatter={(value: number) => formaterMontant(value)} cursor={{fill: currentTheme.isDark ? '#1e293b' : '#f8fafc'}} contentStyle={tooltipStyle} />
-                    <Bar dataKey="montant" radius={[6, 6, 0, 0]}>
-                      {donneesRevenuDepenses.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Advanced Charts (Unlockable) */}
       <Card className="relative overflow-hidden">
@@ -401,26 +413,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* AI Action Button */}
-      <Button 
-        onClick={analyserAvecIA} 
-        disabled={chargementIA} 
-        className="w-full h-16 text-lg rounded-2xl shadow-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:scale-[1.01] transition-transform"
-      >
-        {chargementIA ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div> 
-            Analyse en cours...
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-5 h-5 mr-2" /> 
-            Lancer l&apos;analyse IA 
-            <ChevronRight className="w-5 h-5 ml-2" />
-          </>
-        )}
-      </Button>
     </div>
   );
 }

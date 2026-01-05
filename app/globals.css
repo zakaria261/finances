@@ -7,7 +7,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   
-  /* 1. Set Roobert as the default sans font, fallback to Geist */
   --font-sans: var(--font-roobert), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   
@@ -48,12 +47,11 @@
 }
 
 :root {
-  /* 2. Refined Radii for a modern feel */
   --radius: 0.75rem;
 
-  /* LIGHT MODE - Crisp, Clean Zinc/Indigo Palette */
+  /* LIGHT MODE */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.13 0.028 261.692); /* Zinc 950 */
+  --foreground: oklch(0.13 0.028 261.692);
   
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.13 0.028 261.692);
@@ -61,15 +59,14 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0.028 261.692);
   
-  /* Primary: Vibrant Indigo */
   --primary: oklch(0.491 0.27 277.037);
   --primary-foreground: oklch(0.985 0 0);
   
-  --secondary: oklch(0.967 0.003 264.542); /* Zinc 100 */
-  --secondary-foreground: oklch(0.21 0.034 264.665); /* Zinc 800 */
+  --secondary: oklch(0.967 0.003 264.542);
+  --secondary-foreground: oklch(0.21 0.034 264.665);
   
   --muted: oklch(0.967 0.003 264.542);
-  --muted-foreground: oklch(0.552 0.016 285.938); /* Zinc 500 */
+  --muted-foreground: oklch(0.552 0.016 285.938);
   
   --accent: oklch(0.967 0.003 264.542);
   --accent-foreground: oklch(0.21 0.034 264.665);
@@ -77,19 +74,12 @@
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.92 0.004 286.32); /* Zinc 200 */
+  --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.491 0.27 277.037); /* Matches Primary */
+  --ring: oklch(0.491 0.27 277.037);
 
-  /* Charts */
-  --chart-1: oklch(0.491 0.27 277.037); /* Indigo */
-  --chart-2: oklch(0.696 0.17 162.48);  /* Teal */
-  --chart-3: oklch(0.769 0.188 70.08);  /* Orange */
-  --chart-4: oklch(0.627 0.265 303.9);  /* Pink */
-  --chart-5: oklch(0.645 0.246 16.439); /* Red */
-
-  /* Sidebar Light */
-  --sidebar: oklch(0.984 0.003 247.858); /* Zinc 50 */
+  /* Sidebar */
+  --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.32 0.03 260);
   --sidebar-primary: oklch(0.491 0.27 277.037);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -97,20 +87,25 @@
   --sidebar-accent-foreground: oklch(0.21 0.034 264.665);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.491 0.27 277.037);
+  
+  --chart-1: oklch(0.491 0.27 277.037);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
 }
 
 .dark {
-  /* DARK MODE - Deep Blue-Grey/Zinc Palette */
-  --background: oklch(0.12 0.01 260); /* Deep rich grey */
+  /* DARK MODE */
+  --background: oklch(0.12 0.01 260);
   --foreground: oklch(0.985 0 0);
   
-  --card: oklch(0.15 0.01 260); /* Slightly lighter than bg */
+  --card: oklch(0.15 0.01 260);
   --card-foreground: oklch(0.985 0 0);
   
   --popover: oklch(0.15 0.01 260);
   --popover-foreground: oklch(0.985 0 0);
   
-  /* Primary: Lighter Indigo for Dark Mode contrast */
   --primary: oklch(0.65 0.25 277);
   --primary-foreground: oklch(0.12 0.01 260);
   
@@ -130,14 +125,6 @@
   --input: oklch(0.25 0.01 260);
   --ring: oklch(0.55 0.25 277);
 
-  /* Charts */
-  --chart-1: oklch(0.65 0.25 277);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-
-  /* Sidebar Dark */
   --sidebar: oklch(0.11 0.01 260);
   --sidebar-foreground: oklch(0.92 0 0);
   --sidebar-primary: oklch(0.65 0.25 277);
@@ -146,6 +133,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.25 0.01 260);
   --sidebar-ring: oklch(0.55 0.25 277);
+  
+  --chart-1: oklch(0.65 0.25 277);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
 }
 
 @layer base {
@@ -157,7 +150,8 @@
   }
 }
 
-/* 3. Improved Animations */
+/* --- Utilities --- */
+
 @keyframes appear-up {
   from {
     opacity: 0;
@@ -172,10 +166,9 @@
 }
 
 .animate-appear {
-  animation: appear-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: appear-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-/* Gradient Background Animation */
 @keyframes gradient-move {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -188,10 +181,12 @@
   animation: gradient-move 10s ease infinite;
 }
 
-/* 4. Glassmorphism Utility */
 .glass {
-  @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg;
+  @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-lg;
 }
-.dark .glass {
-  @apply bg-black/10 border-white/10;
+
+/* Dot Pattern Background */
+.bg-grid-pattern {
+  background-size: 30px 30px;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
 }

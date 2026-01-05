@@ -7,37 +7,46 @@ if (!process.env.GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use a cheaper/faster model for basic JSON tasks
+// Use a model capable of good reasoning (Flash is fast and cost-effective for this)
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash-lite",
-    // Force JSON mode where supported, but we still clean the output manually below to be safe
+    model: "gemini-2.0-flash", 
     generationConfig: { responseMimeType: "application/json" }
 });
 
-// Helper to strip Markdown code blocks
+// Helper to strip Markdown code blocks if the model adds them
 function cleanJsonOutput(text: string) {
-  // Remove ```json and ``` wrapping
-  const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
-  return cleaned;
+  return text.replace(/```json/g, "").replace(/```/g, "").trim();
 }
 
 export async function runFinancialAnalysis(financialData: any) {
   const prompt = `
-    You are an expert financial analyst. Analyze the following financial data for a user and provide a concise, insightful report.
+    You are an elite financial strategist. Analyze the provided user data (transactions, goals, assets, debts).
+    
+    Data Context:
+    - Transactions: Last 100 entries. Look for recurring patterns, impulse buys, and category bloat.
+    - Debts vs Assets: Analyze net worth trends and liquidity.
+    - Summary Stats: Use the pre-calculated totals for accuracy.
+    
+    Perform a deep analysis and return a strict JSON object with this exact structure:
+    {
+      "financialScore": <number 0-100>,
+      "financialPersona": "<string (e.g., 'Aggressive Saver', 'Impulsive Spender', 'Balanced Planner', 'Debt Juggler')>",
+      "executiveSummary": "<string (2 sentences max, punchy and direct)>",
+      "keyTrends": [
+        { "title": "<string>", "direction": "<'up' | 'down' | 'flat'>", "insight": "<string>" }
+      ],
+      "actionableSteps": [
+        { "action": "<string>", "impact": "<string (e.g., 'Save $200/mo')>", "difficulty": "<'High' | 'Medium' | 'Low'>" }
+      ],
+      "forecast": {
+        "nextMonthSavings": <number (estimated savings for next month)>,
+        "debtFreeProjection": "<string (e.g., '14 months', 'N/A' if no debt, or 'Unknown')>",
+        "wealthProjection6Months": <number (estimated total net worth in 6 months)>
+      }
+    }
 
     Financial Data:
     ${JSON.stringify(financialData, null, 2)}
-
-    Your task is to return a JSON object with the exact following structure:
-    {
-      "score": <number 0-100>,
-      "summary": "<string>",
-      "strengths": ["<string>", "<string>"],
-      "weaknesses": ["<string>", "<string>"],
-      "recommendations": ["<string>", "<string>", "<string>"]
-    }
-
-    Do not include any introductory text. Just return the JSON string.
   `;
 
   const result = await model.generateContent(prompt);

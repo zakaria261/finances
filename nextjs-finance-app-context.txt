@@ -507,55 +507,337 @@ export default function RegisterPage() {
 // FILE: app/(main)/budgets/page.tsx
 // ============================================================================
 
-import { getBudgetsWithSpending } from "@/lib/actions/budget.actions";
-import { AddBudgetDialog } from "@/components/budgets/add-budget-dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/utils";
-import { Empty } from "@/components/ui/empty";
-import { Landmark } from "lucide-react";
+'use client';
 
-export default async function BudgetsPage() {
-  const budgets = await getBudgetsWithSpending();
+import React, { useState } from 'react';
+import { PlusCircle, Trash2, TrendingDown, AlertTriangle, CreditCard } from 'lucide-react';
+import { CATEGORIES } from '@/constants';
+import type { Depense, DepenseFrequence } from '@/types';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { cn } from '@/lib/utils';
+import { formaterMontant, calculerMontantMensuel } from '@/utils/financeCalculations';
+
+const initialState: Omit<Depense, 'id'> = {
+  nom: '',
+  montant: '',
+  frequence: 'mensuel',
+  categorie: 'abonnements',
+  dateDebut: new Date().toISOString().split('T')[0],
+  montantTotal: '',
+  mensualitesRestantes: '',
+  tauxInteret: '',
+  nombrePaiements: '',
+  paiementsRestants: '',
+  typeAssurance: 'auto'
+};
+
+export default function BudgetsPage() {
+  const { depenses, setDepenses } = useFinanceData();
+  const [nouvelleDepense, setNouvelleDepense] = useState(initialState);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const { currentTheme } = useTheme();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setNouvelleDepense(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+    const montantNum = parseFloat(nouvelleDepense.montant);
+
+    if (!nouvelleDepense.nom.trim()) newErrors.nom = "Le nom est requis.";
+    if (isNaN(montantNum) || montantNum <= 0) newErrors.montant = "Le montant doit être un nombre positif.";
+
+    if (nouvelleDepense.categorie === 'credit') {
+      const montantTotalNum = parseFloat(nouvelleDepense.montantTotal || '');
+      const mensualitesNum = parseInt(nouvelleDepense.mensualitesRestantes || '');
+      const tauxNum = parseFloat(nouvelleDepense.tauxInteret || '');
+
+      if (isNaN(montantTotalNum) || montantTotalNum <= 0) newErrors.montantTotal = "Montant total invalide.";
+      if (isNaN(mensualitesNum) || mensualitesNum <= 0) newErrors.mensualitesRestantes = "Nombre de mensualités invalide.";
+      if (isNaN(tauxNum) || tauxNum < 0) newErrors.tauxInteret = "Taux invalide.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const ajouterDepense = () => {
+    if (validate()) {
+      setDepenses(prev => [...prev, { ...nouvelleDepense, id: Date.now() }]);
+      setNouvelleDepense(initialState);
+      setErrors({});
+    }
+  };
+
+  const confirmerSuppression = (id: number) => {
+    setDeleteConfirmId(id);
+  };
+
+  const annulerSuppression = () => {
+    setDeleteConfirmId(null);
+  };
+
+  const executerSuppression = () => {
+    if (deleteConfirmId !== null) {
+      setDepenses(depenses.filter(d => d.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const inputClass = cn(
+    "w-full px-4 py-3 rounded-xl border-2 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200",
+    currentTheme.colors.input,
+    currentTheme.colors.border,
+    currentTheme.colors.text
+  );
+
+  const totalMensuel = depenses.reduce((acc, dep) => acc + calculerMontantMensuel(dep), 0);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">Budgets</h1>
-        <AddBudgetDialog />
+    <div className="space-y-6 animate-fadeIn relative">
+      
+      {/* Modal de confirmation */}
+      {deleteConfirmId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className={cn(
+            "rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 border transform transition-all scale-100",
+            currentTheme.colors.card,
+            currentTheme.colors.border
+          )}>
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className={cn("text-xl font-bold", currentTheme.colors.text)}>
+                Confirmer la suppression
+              </h3>
+              <p className={currentTheme.colors.subtext}>
+                Êtes-vous sûr de vouloir supprimer cette dépense ?
+              </p>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={annulerSuppression}
+                  className={cn(
+                    "flex-1 px-4 py-2 rounded-xl border font-semibold transition-colors hover:opacity-80",
+                    currentTheme.colors.border,
+                    currentTheme.colors.text
+                  )}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={executerSuppression}
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 shadow-lg shadow-red-500/30 transition-colors"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Formulaire d'ajout */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h2 className={cn("text-2xl font-bold mb-6 flex items-center gap-3", currentTheme.colors.text)}>
+          <div className="p-2 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl">
+            <PlusCircle className="w-6 h-6 text-white" />
+          </div>
+          Ajouter une dépense
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mb-6">
+          <div>
+            <input
+              type="text"
+              placeholder="Nom"
+              name="nom"
+              value={nouvelleDepense.nom}
+              onChange={handleInputChange}
+              className={cn(inputClass, errors.nom && 'border-red-500')}
+            />
+            {errors.nom && <p className="text-red-500 text-xs mt-1">{errors.nom}</p>}
+          </div>
+          <div>
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Montant (€)"
+              name="montant"
+              value={nouvelleDepense.montant}
+              onChange={handleInputChange}
+              className={cn(inputClass, errors.montant && 'border-red-500')}
+            />
+            {errors.montant && <p className="text-red-500 text-xs mt-1">{errors.montant}</p>}
+          </div>
+          <select
+            name="frequence"
+            value={nouvelleDepense.frequence}
+            onChange={handleInputChange}
+            className={inputClass}
+          >
+            <option value="hebdomadaire">Hebdomadaire</option>
+            <option value="mensuel">Mensuel</option>
+            <option value="trimestriel">Trimestriel</option>
+            <option value="semestriel">Semestriel</option>
+            <option value="annuel">Annuel</option>
+          </select>
+          <select
+            name="categorie"
+            value={nouvelleDepense.categorie}
+            onChange={handleInputChange}
+            className={inputClass}
+          >
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <option key={key} value={key}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Champs supplémentaires pour les crédits */}
+        {nouvelleDepense.categorie === 'credit' && (
+          <div className={cn(
+            "grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2 mb-6 p-4 rounded-lg",
+            currentTheme.isDark ? "bg-amber-900/20" : "bg-amber-50"
+          )}>
+            <div>
+              <input
+                type="number"
+                placeholder="Montant total emprunté (€)"
+                name="montantTotal"
+                value={nouvelleDepense.montantTotal}
+                onChange={handleInputChange}
+                className={cn(inputClass, errors.montantTotal && 'border-red-500')}
+              />
+              {errors.montantTotal && <p className="text-red-500 text-xs mt-1">{errors.montantTotal}</p>}
+            </div>
+            <div>
+              <input
+                type="number"
+                placeholder="Mensualités restantes"
+                name="mensualitesRestantes"
+                value={nouvelleDepense.mensualitesRestantes}
+                onChange={handleInputChange}
+                className={cn(inputClass, errors.mensualitesRestantes && 'border-red-500')}
+              />
+              {errors.mensualitesRestantes && <p className="text-red-500 text-xs mt-1">{errors.mensualitesRestantes}</p>}
+            </div>
+            <div>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Taux d'intérêt (%)"
+                name="tauxInteret"
+                value={nouvelleDepense.tauxInteret}
+                onChange={handleInputChange}
+                className={cn(inputClass, errors.tauxInteret && 'border-red-500')}
+              />
+              {errors.tauxInteret && <p className="text-red-500 text-xs mt-1">{errors.tauxInteret}</p>}
+            </div>
+          </div>
+        )}
+        
+        <button
+          onClick={ajouterDepense}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:opacity-90 shadow-lg transition-all"
+        >
+          <PlusCircle className="w-5 h-5" /> Ajouter la dépense
+        </button>
       </div>
 
-      {budgets.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {budgets.map((budget) => (
-            <Card key={budget.id}>
-              <CardHeader>
-                <CardTitle>{budget.category}</CardTitle>
-                <CardDescription>Monthly Spending Limit: {formatCurrency(budget.limit)}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="font-semibold">{formatCurrency(budget.spent)} spent</div>
-                  <Progress value={budget.progress} className={budget.progress > 100 ? "[&>div]:bg-red-500" : ""}/>
-                </div>
-              </CardContent>
-              <CardFooter>
-                 <p className={`text-sm font-medium ${budget.remaining < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                    {budget.remaining >= 0 ? `${formatCurrency(budget.remaining)} remaining` : `${formatCurrency(Math.abs(budget.remaining))} over budget`}
-                 </p>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Empty>
-            <Landmark className="h-12 w-12 text-muted-foreground" />
-            <div className="text-center">
-                <h3 className="text-lg font-semibold">No Budgets Found</h3>
-                <p className="text-muted-foreground text-sm mt-1">Create a budget to start tracking your spending.</p>
+      {/* Résumé */}
+      <div className={cn(
+        "rounded-2xl p-4 shadow-xl border backdrop-blur-xl",
+        currentTheme.isDark ? "bg-red-900/20 border-red-800/30" : "bg-red-50 border-red-200"
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-red-500 to-pink-500 rounded-xl">
+              <TrendingDown className="w-5 h-5 text-white" />
             </div>
-        </Empty>
-      )}
+            <span className={cn("font-semibold", currentTheme.colors.text)}>Total dépenses mensuelles</span>
+          </div>
+          <span className="text-2xl font-bold text-red-600">{formaterMontant(totalMensuel)}</span>
+        </div>
+      </div>
+
+      {/* Liste des dépenses */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h3 className={cn("text-xl font-bold mb-4", currentTheme.colors.text)}>
+          Mes dépenses ({depenses.length})
+        </h3>
+        <div className="space-y-3">
+          {depenses.length === 0 && (
+            <p className={cn("text-center py-4", currentTheme.colors.subtext)}>
+              Aucune dépense ajoutée pour le moment.
+            </p>
+          )}
+          {depenses.map(dep => {
+            const catInfo = CATEGORIES[dep.categorie];
+            const montantMensuel = calculerMontantMensuel(dep);
+            
+            return (
+              <div
+                key={dep.id}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-xl border hover:shadow-lg transition-all",
+                  currentTheme.colors.border,
+                  currentTheme.isDark ? "bg-slate-800/40" : "bg-gradient-to-r from-red-50 to-pink-50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="p-2 rounded-lg"
+                    style={{ backgroundColor: catInfo?.color || '#6366f1' }}
+                  >
+                    {dep.categorie === 'credit' ? (
+                      <CreditCard className="w-5 h-5 text-white" />
+                    ) : (
+                      <TrendingDown className="w-5 h-5 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className={cn("font-bold", currentTheme.colors.text)}>{dep.nom}</div>
+                    <div className={cn("text-sm", currentTheme.colors.subtext)}>
+                      {parseFloat(dep.montant).toFixed(2)}€ · {dep.frequence}
+                      {dep.frequence !== 'mensuel' && (
+                        <span className="text-indigo-600 font-medium"> ({formaterMontant(montantMensuel)}/mois)</span>
+                      )}
+                    </div>
+                    <div className={cn("text-xs", currentTheme.colors.subtext)}>
+                      {catInfo?.label || 'Autre'}
+                      {dep.categorie === 'credit' && dep.mensualitesRestantes && (
+                        <span> · {dep.mensualitesRestantes} mensualités restantes</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => confirmerSuppression(dep.id)}
+                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -564,190 +846,429 @@ export default async function BudgetsPage() {
 // FILE: app/(main)/dashboard/page.tsx
 // ============================================================================
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { DollarSign, PiggyBank, Scale, TrendingUp, HandCoins } from "lucide-react";
-import { getTransactions } from "@/lib/actions/transaction.actions";
-import { formatCurrency } from "@/lib/utils";
-import {
-  startOfMonth,
-  endOfMonth,
-  subMonths,
-  format,
-} from "date-fns";
-import { MonthlySummaryChart } from "@/components/dashboard/monthly-summary-chart";
-import { ExpenseByCategoryChart } from "@/components/dashboard/expense-by-category-chart";
-import { AiInsightsCard } from "@/components/dashboard/ai-insights-card";
-import { getDashboardStats } from "@/lib/actions/dashboard.actions";
-import { SeasonPassCard } from "@/components/gamification/season-pass-card";
-import { getGameState } from "@/lib/actions/gamification.actions";
+'use client';
 
-export default async function DashboardPage() {
-  const [transactions, stats, gameState] = await Promise.all([
-      getTransactions(),
-      getDashboardStats(),
-      getGameState(),
-  ]);
+import React, { useMemo, useState } from 'react';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Radar, RadarChart, PolarGrid, 
+  PolarAngleAxis, PolarRadiusAxis 
+} from 'recharts';
+import { 
+  TrendingUp, TrendingDown, Wallet, Target, Flame, Star, Trophy, 
+  Sparkles, ChevronRight, PiggyBank, AlertTriangle, AlertCircle, 
+  FileDown, Lock 
+} from 'lucide-react';
 
-  // --- Data for Monthly Summary Bar Chart (Last 6 Months) ---
-  const now = new Date();
-  const monthlySummaryData = Array.from({ length: 6 }).map((_, i) => {
-    const date = subMonths(now, 5 - i);
-    const monthStart = startOfMonth(date);
-    const monthEnd = endOfMonth(date);
+import { formaterMontant, calculerMontantMensuel } from '@/utils/financeCalculations';
+import { CATEGORIES } from '@/constants';
+import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState } from '@/types';
+import { useTheme } from '@/context/ThemeContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { useFinanceData } from '@/context/FinanceDataContext';
 
-    const monthTransactions = transactions.filter(
-      (t) => new Date(t.date) >= monthStart && new Date(t.date) <= monthEnd
-    );
+interface StatCardProps {
+  label: string;
+  value: string;
+  icon: React.ElementType;
+  gradient: string;
+  bg: string;
+  count: string;
+}
 
-    const income = monthTransactions
-      .filter((t) => t.type === "INCOME")
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const expense = monthTransactions
-      .filter((t) => t.type === "EXPENSE")
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    return {
-      month: format(date, "MMM"),
-      income,
-      expense,
-    };
-  });
+const StatCard: React.FC<StatCardProps> = ({ label, value, icon: Icon, gradient, bg, count }) => {
+  const { currentTheme } = useTheme();
+  const bgClass = currentTheme.isDark ? `bg-slate-800/50` : `bg-gradient-to-br ${bg}`;
   
-  // --- Data for Expense by Category Donut Chart (Current Month) ---
-   const currentMonthStart = startOfMonth(now);
-   const currentMonthEnd = endOfMonth(now);
-   const monthlyTransactions = transactions.filter(
-    (t) => new Date(t.date) >= currentMonthStart && new Date(t.date) <= currentMonthEnd
+  return (
+    <Card className={`border-none overflow-hidden relative group hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 ${bgClass}`}>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg text-white`}>
+            <Icon className="w-6 h-6" />
+          </div>
+          <Badge variant="secondary" className={currentTheme.isDark ? "bg-slate-700 text-slate-200" : "bg-white/50 backdrop-blur-md"}>
+            {count}
+          </Badge>
+        </div>
+        <div className="space-y-1">
+          <p className={cn("text-sm font-medium", currentTheme.colors.subtext)}>{label}</p>
+          <h4 className={cn("text-3xl font-bold tracking-tight", currentTheme.colors.text)}>{value}</h4>
+        </div>
+      </CardContent>
+    </Card>
   );
+};
+
+export default function DashboardPage() {
+  const {
+    cashFlow,
+    scoreSante,
+    totalRevenusMensuel,
+    totalDepensesMensuel,
+    patrimoineNet,
+    revenus,
+    depenses,
+    objectifs,
+    actifs,
+    tropheesDeverrouilles,
+    analyserAvecIA,
+    chargementIA,
+    budgets,
+    setBudgets,
+    gameState
+  } = useFinanceData();
+
+  const [nouveauBudget, setNouveauBudget] = useState({ categorie: Object.keys(CATEGORIES)[0], limite: '' });
+  const [budgetError, setBudgetError] = useState('');
+  const { currentTheme } = useTheme();
+
+  const isCsvUnlocked = gameState.unlockedFeatures.includes('export_csv');
+  const isRadarUnlocked = gameState.unlockedFeatures.includes('radar_chart');
+
+  const donneesParCategorie = Object.keys(CATEGORIES).map(cat => ({
+    name: CATEGORIES[cat].label,
+    value: depenses.filter(d => d.categorie === cat).reduce((acc, d) => acc + calculerMontantMensuel(d), 0),
+    color: CATEGORIES[cat].color,
+    fullMark: 100
+  })).filter(d => d.value > 0);
   
-  const expenseByCategory = monthlyTransactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>);
-  
-  const chartColors = [
-      "hsl(var(--chart-1))",
-      "hsl(var(--chart-2))",
-      "hsl(var(--chart-3))",
-      "hsl(var(--chart-4))",
-      "hsl(var(--chart-5))",
+  const donneesRevenuDepenses = [
+    { categorie: 'Revenus', montant: totalRevenusMensuel, color: '#10B981' },
+    { categorie: 'Dépenses', montant: totalDepensesMensuel, color: '#EF4444' },
+    { categorie: 'Cash Flow', montant: Math.max(0, cashFlow), color: '#6366f1' }
   ];
 
-  const expenseByCategoryData = Object.entries(expenseByCategory)
-    .map(([category, amount], index) => ({
-      category,
-      amount,
-      fill: chartColors[index % chartColors.length],
-    }))
-    .sort((a, b) => b.amount - a.amount);
+  const depensesMensuellesParCategorie = useMemo(() => {
+    const map: { [key: string]: number } = {};
+    depenses.forEach(dep => {
+      const montant = calculerMontantMensuel(dep);
+      map[dep.categorie] = (map[dep.categorie] || 0) + montant;
+    });
+    return map;
+  }, [depenses]);
 
+  const handleAjouterBudget = () => {
+    const limite = parseFloat(nouveauBudget.limite);
+    if (isNaN(limite) || limite <= 0) { 
+      setBudgetError('Montant invalide.'); 
+      return; 
+    }
+    setBudgetError('');
+    setBudgets(prev => {
+      const existing = prev.find(b => b.categorie === nouveauBudget.categorie);
+      if (existing) return prev.map(b => b.categorie === nouveauBudget.categorie ? { ...b, limite } : b);
+      return [...prev, { categorie: nouveauBudget.categorie as keyof typeof CATEGORIES, limite }];
+    });
+    setNouveauBudget({ categorie: nouveauBudget.categorie, limite: '' });
+  };
+
+  const exportCSV = () => {
+    if (!isCsvUnlocked) return;
+    const headers = ['Date', 'Nom', 'Montant', 'Catégorie', 'Fréquence'];
+    const rows = depenses.map(d => [new Date().toLocaleDateString(), d.nom, d.montant, CATEGORIES[d.categorie].label, d.frequence]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "mes_finances.csv");
+    document.body.appendChild(link);
+    link.click();
+  };
+
+  const budgetAlerts = useMemo(() => {
+    return budgets.map(budget => {
+      const spent = depensesMensuellesParCategorie[budget.categorie] || 0;
+      const percentage = budget.limite > 0 ? (spent / budget.limite) * 100 : 0;
+      if (percentage >= 80) return { ...budget, spent, percentage };
+      return null;
+    }).filter((b): b is NonNullable<typeof b> => b !== null);
+  }, [budgets, depensesMensuellesParCategorie]);
+
+  const tooltipStyle = {
+    borderRadius: '12px', 
+    border: 'none', 
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)',
+    backgroundColor: currentTheme.isDark ? '#1e293b' : '#fff',
+    color: currentTheme.isDark ? '#f8fafc' : '#0f172a'
+  };
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold leading-none tracking-tight">
-        Welcome Back!
-      </h1>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold`}>
-              {formatCurrency(stats.netWorth)}
+    <div className="space-y-8 animate-fadeIn pb-12">
+      {/* Actions Bar (Export) */}
+      <div className="flex justify-end">
+        {isCsvUnlocked ? (
+          <Button variant="outline" size="sm" onClick={exportCSV} className="flex items-center gap-2">
+            <FileDown className="w-4 h-4"/> Exporter CSV
+          </Button>
+        ) : (
+          <div className="group relative">
+            <Button variant="outline" size="sm" disabled className="flex items-center gap-2 opacity-60 cursor-not-allowed">
+              <Lock className="w-3 h-3"/> Export CSV
+            </Button>
+            <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-slate-800 text-white text-xs rounded shadow-xl hidden group-hover:block z-50 text-center">
+              Débloquez au Niveau 2 du Pass (Gratuit)
             </div>
-            <p className="text-xs text-muted-foreground">
-              Total assets minus total debts
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Monthly Cash Flow
-            </CardTitle>
-            <Scale className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-             <div className={`text-2xl font-bold ${stats.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-               {formatCurrency(stats.cashFlow)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This month&apos;s income vs. expenses
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Savings
-            </CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalSavings)}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all savings goals
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Budgets
-            </CardTitle>
-            <HandCoins className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.budgets.count}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.budgets.onTrack} on track, {stats.budgets.overspent} over
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
-      
-      {/* Chart & AI Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 grid gap-4">
-             <Card>
-              <CardHeader>
-                <CardTitle>Monthly Summary</CardTitle>
-                <CardDescription>
-                  Income vs. Expense for the last 6 months.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MonthlySummaryChart data={monthlySummaryData} />
-              </CardContent>
-            </Card>
-             <Card>
-              <CardHeader>
-                <CardTitle>Expense Breakdown</CardTitle>
-                <CardDescription>
-                  How your expenses are categorized this month.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ExpenseByCategoryChart data={expenseByCategoryData} />
-              </CardContent>
-            </Card>
-        </div>
-        <div className="space-y-4">
-            <AiInsightsCard />
-            <SeasonPassCard gameState={gameState} />
+
+      {/* Alertes */}
+      {budgetAlerts.length > 0 && (
+        <Card className="border-amber-200/50 bg-amber-50/80 dark:bg-amber-900/20">
+          <CardContent className="p-4 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold mb-2">
+              <AlertTriangle className="w-5 h-5"/> Alertes Budgétaires
+            </div>
+            {budgetAlerts.map(alert => (
+              <div key={alert.categorie} className="flex items-center justify-between text-sm p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-amber-100/50">
+                <span className="dark:text-amber-100">{CATEGORIES[alert.categorie].label}</span>
+                <Badge variant={alert.percentage > 100 ? "destructive" : "secondary"}>
+                  {alert.percentage.toFixed(0)}% ({formaterMontant(alert.spent)})
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Hero Card */}
+      <div className={`relative overflow-hidden rounded-3xl p-8 shadow-2xl transform hover:scale-[1.01] transition-all duration-500 ${cashFlow >= 0 ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500' : 'bg-gradient-to-br from-amber-500 via-orange-500 to-red-500'}`}>
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-50 animate-pulse"></div>
+        <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start gap-2 text-white/90 text-sm mb-2 font-medium uppercase tracking-wider">
+              <Flame className="w-4 h-4" />Cash Flow Net
+            </div>
+            <div className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
+              {formaterMontant(cashFlow)}
+            </div>
+            <Badge className="bg-white/20 text-white border-none backdrop-blur-md px-4 py-1 text-sm font-normal">
+              {cashFlow >= 0 ? 'Situation saine' : 'Déficit mensuel'}
+            </Badge>
+          </div>
+          
+          <div className="relative bg-white/10 backdrop-blur-xl p-8 rounded-3xl border border-white/20 text-center min-w-[240px]">
+            <div className="text-white/80 text-sm mb-2 font-medium">Score de Santé</div>
+            <div className="flex items-baseline justify-center gap-1 mb-3">
+              <span className="text-6xl font-bold text-white">{scoreSante}</span>
+              <span className="text-xl text-white/60">/100</span>
+            </div>
+            <div className="flex justify-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className={`w-5 h-5 ${i < Math.floor(scoreSante / 20) ? 'text-yellow-300 fill-yellow-300' : 'text-white/20'}`} />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Revenus" value={formaterMontant(totalRevenusMensuel)} icon={TrendingUp} gradient="from-emerald-500 to-teal-500" bg="from-emerald-50 to-teal-50" count={`${revenus.length} sources`} />
+        <StatCard label="Dépenses" value={formaterMontant(totalDepensesMensuel)} icon={TrendingDown} gradient="from-red-500 to-pink-500" bg="from-red-50 to-pink-50" count={`${depenses.length} dépenses`} />
+        <StatCard label="Patrimoine" value={formaterMontant(patrimoineNet)} icon={Wallet} gradient="from-indigo-500 to-purple-500" bg="from-indigo-50 to-purple-50" count={`${actifs.length} actifs`} />
+        <StatCard label="Objectifs" value={objectifs.length.toString()} icon={Target} gradient="from-purple-500 to-pink-500" bg="from-purple-50 to-pink-50" count="En cours" />
+      </div>
+
+      {/* Charts Section */}
+      {(depenses.length > 0 || revenus.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Répartition</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {donneesParCategorie.length > 0 ? (
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={donneesParCategorie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {donneesParCategorie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => [formaterMontant(value), "Montant"]} contentStyle={tooltipStyle} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <div className="h-[250px] flex items-center justify-center text-slate-400">Aucune donnée</div>}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Aperçu Mensuel</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={donneesRevenuDepenses} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
+                    <XAxis dataKey="categorie" stroke={currentTheme.colors.chartText} tick={{fontSize: 12}} axisLine={false} tickLine={false} />
+                    <YAxis stroke={currentTheme.colors.chartText} tickFormatter={(value) => `${value}€`} tick={{fontSize: 12}} axisLine={false} tickLine={false}/>
+                    <Tooltip formatter={(value: number) => formaterMontant(value)} cursor={{fill: currentTheme.isDark ? '#1e293b' : '#f8fafc'}} contentStyle={tooltipStyle} />
+                    <Bar dataKey="montant" radius={[6, 6, 0, 0]}>
+                      {donneesRevenuDepenses.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Advanced Charts (Unlockable) */}
+      <Card className="relative overflow-hidden">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-500"/> Analyses Avancées
+            {!isRadarUnlocked && <Badge variant="secondary" className="ml-2 flex items-center gap-1"><Lock className="w-3 h-3"/> Verrouillé</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className={`h-[300px] w-full transition-all duration-500 ${!isRadarUnlocked ? 'blur-sm opacity-50 pointer-events-none select-none' : ''}`}>
+            {donneesParCategorie.length > 2 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={donneesParCategorie}>
+                  <PolarGrid gridType="polygon" stroke={currentTheme.isDark ? "#334155" : "#e2e8f0"} />
+                  <PolarAngleAxis dataKey="name" tick={{ fill: currentTheme.colors.chartText, fontSize: 12 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                  <Radar name="Dépenses" dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.6} />
+                  <Tooltip formatter={(value: number) => formaterMontant(value)} contentStyle={tooltipStyle} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">Ajoutez plus de catégories pour voir le radar.</div>
+            )}
+          </div>
+          
+          {!isRadarUnlocked && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/10">
+              <div className={cn("p-6 rounded-2xl shadow-xl text-center border max-w-sm mx-4", currentTheme.colors.card, currentTheme.colors.border)}>
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-6 h-6 text-purple-600"/>
+                </div>
+                <h4 className={cn("text-lg font-bold mb-2", currentTheme.colors.text)}>Contenu Elite</h4>
+                <p className={cn("text-sm mb-4", currentTheme.colors.subtext)}>Atteignez le <span className="font-bold text-purple-600">Niveau 5</span> du Pass Elite pour débloquer l&apos;analyse radar de vos dépenses.</p>
+                <Button disabled variant="outline">Verrouillé</Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Budgets Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><PiggyBank className="w-5 h-5"/> Budgets Mensuels</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <select 
+                value={nouveauBudget.categorie} 
+                onChange={e => setNouveauBudget({...nouveauBudget, categorie: e.target.value})} 
+                className={cn(
+                  "flex h-10 w-full items-center justify-between rounded-xl border px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                  currentTheme.colors.input,
+                  currentTheme.colors.border,
+                  currentTheme.colors.text
+                )}
+              >
+                {Object.entries(CATEGORIES).map(([key, cat]) => (<option key={key} value={key}>{cat.label}</option>))}
+              </select>
+            </div>
+            <Input 
+              type="number" 
+              placeholder="Limite (€)" 
+              value={nouveauBudget.limite} 
+              onChange={e => setNouveauBudget({...nouveauBudget, limite: e.target.value})}
+              className="flex-1" 
+            />
+            <Button onClick={handleAjouterBudget}>Définir</Button>
+          </div>
+          {budgetError && <p className="text-red-500 text-sm mb-4">{budgetError}</p>}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {budgets.map(budget => {
+              const catInfo = CATEGORIES[budget.categorie];
+              const spent = depensesMensuellesParCategorie[budget.categorie] || 0;
+              const percentage = Math.min(100, (spent / budget.limite) * 100);
+              const isWarning = percentage >= 80 && percentage < 100;
+              const isDanger = percentage >= 100;
+
+              return (
+                <div key={budget.categorie} className={cn("p-4 rounded-xl border", currentTheme.colors.border, currentTheme.isDark ? 'bg-slate-800/50' : 'bg-slate-50')}>
+                  <div className="flex justify-between items-center mb-2">
+                    <div className={cn("flex items-center gap-2 font-medium", currentTheme.colors.text)}>
+                      {isDanger && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                      {isWarning && <AlertCircle className="w-4 h-4 text-amber-500" />}
+                      {catInfo.label}
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${isDanger ? 'bg-red-100 text-red-700' : isWarning ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {percentage.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className={cn("flex justify-between text-sm mb-2", currentTheme.colors.subtext)}>
+                    <span>{formaterMontant(spent)}</span>
+                    <span>{formaterMontant(budget.limite)}</span>
+                  </div>
+                  <div className={cn("h-2 w-full rounded-full overflow-hidden", currentTheme.isDark ? "bg-slate-700" : "bg-slate-200")}>
+                    <div className={`h-full rounded-full transition-all duration-500 ${isDanger ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${percentage}%` }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Trophies Section */}
+      {tropheesDeverrouilles.length > 0 && (
+        <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200 dark:from-amber-900/20 dark:to-yellow-900/20 dark:border-amber-800/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-400">
+              <Trophy className="w-6 h-6 text-amber-500" /> Trophées
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tropheesDeverrouilles.map(trophee => (
+                <div key={trophee.id} className={cn("rounded-xl p-4 shadow-sm border flex flex-col items-center text-center hover:shadow-md transition-shadow", currentTheme.colors.card, currentTheme.colors.border)}>
+                  <div className="text-4xl mb-2">{trophee.nom.split(' ')[0]}</div>
+                  <div className={cn("font-bold text-sm", currentTheme.colors.text)}>{trophee.nom}</div>
+                  <div className={cn("text-xs", currentTheme.colors.subtext)}>{trophee.description}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Action Button */}
+      <Button 
+        onClick={analyserAvecIA} 
+        disabled={chargementIA} 
+        className="w-full h-16 text-lg rounded-2xl shadow-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:scale-[1.01] transition-transform"
+      >
+        {chargementIA ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div> 
+            Analyse en cours...
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-5 h-5 mr-2" /> 
+            Lancer l&apos;analyse IA 
+            <ChevronRight className="w-5 h-5 ml-2" />
+          </>
+        )}
+      </Button>
     </div>
   );
 }
@@ -756,46 +1277,565 @@ export default async function DashboardPage() {
 // FILE: app/(main)/debts/page.tsx
 // ============================================================================
 
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import { TrendingDown, Info, Calculator, Zap, Shield, CreditCard, AlertTriangle } from 'lucide-react';
+import type { Depense } from '@/types';
+import { formaterMontant } from '@/utils/financeCalculations';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+interface PayoffResult {
+  months: number;
+  totalInterest: number;
+}
+
+export default function DebtsPage() {
+  const { depenses, strategieDette, setStrategieDette } = useFinanceData();
+  const { currentTheme } = useTheme();
+  
+  const credits = useMemo(() => depenses.filter(d => d.categorie === 'credit'), [depenses]);
+  
+  const [extraPayment, setExtraPayment] = useState('');
+  const [comparison, setComparison] = useState<{ avalanche: PayoffResult; snowball: PayoffResult } | null>(null);
+  const [error, setError] = useState('');
+
+  // Total des dettes
+  const totalDettes = credits.reduce((acc, d) => acc + (parseFloat(d.montantTotal || '0')), 0);
+  const mensualitesTotales = credits.reduce((acc, d) => acc + (parseFloat(d.montant) || 0), 0);
+
+  const dettesOptimisees = useMemo(() => {
+    if (strategieDette === 'avalanche') {
+      return [...credits].sort((a, b) => parseFloat(b.tauxInteret || '0') - parseFloat(a.tauxInteret || '0'));
+    } else {
+      return [...credits].sort((a, b) => parseFloat(a.montantTotal || '0') - parseFloat(b.montantTotal || '0'));
+    }
+  }, [credits, strategieDette]);
+
+  const simulatePayoff = (
+    initialDebts: Depense[], 
+    extraMonthlyPayments: number[], 
+    simStrategy: 'avalanche' | 'boule de neige'
+  ): PayoffResult => {
+    const debts = JSON.parse(JSON.stringify(initialDebts)).map((d: Depense) => ({
+      ...d,
+      balance: parseFloat(d.montantTotal || '0'),
+      minPayment: parseFloat(d.montant || '0'),
+      rate: (parseFloat(d.tauxInteret || '0') / 100) / 12,
+    }));
+
+    let months = 0;
+    let totalInterest = 0;
+    
+    while (debts.some((d: { balance: number }) => d.balance > 0)) {
+      months++;
+      if (months > 1200) return { months: -1, totalInterest: -1 };
+
+      const currentExtraPayment = extraMonthlyPayments.length > 0
+        ? extraMonthlyPayments[(months - 1) % extraMonthlyPayments.length]
+        : 0;
+
+      let paidOffSnowball = 0;
+      debts.forEach((d: { balance: number; rate: number; minPayment: number }) => {
+        if (d.balance <= 0) {
+          paidOffSnowball += d.minPayment;
+        } else {
+          const interest = d.balance * d.rate;
+          totalInterest += interest;
+          d.balance += interest;
+        }
+      });
+      
+      debts.forEach((d: { balance: number; minPayment: number }) => {
+        if (d.balance > 0) {
+          const payment = Math.min(d.balance, d.minPayment);
+          d.balance -= payment;
+        }
+      });
+      
+      let availableExtra = currentExtraPayment + paidOffSnowball;
+      const targetDebts = debts.filter((d: { balance: number }) => d.balance > 0);
+
+      if (simStrategy === 'avalanche') {
+        targetDebts.sort((a: { rate: number }, b: { rate: number }) => b.rate - a.rate);
+      } else {
+        targetDebts.sort((a: { balance: number }, b: { balance: number }) => a.balance - b.balance);
+      }
+
+      for (const target of targetDebts) {
+        if (availableExtra > 0) {
+          const extraPay = Math.min(target.balance, availableExtra);
+          target.balance -= extraPay;
+          availableExtra -= extraPay;
+        }
+      }
+    }
+    return { months, totalInterest };
+  };
+
+  const handleComparison = () => {
+    const extraPaymentsArray = extraPayment
+      .split(/[, ]+/)
+      .map(s => parseFloat(s))
+      .filter(n => !isNaN(n) && n > 0);
+    
+    if (extraPaymentsArray.length === 0) {
+      setError("Veuillez entrer au moins un montant supplémentaire valide et positif.");
+      return;
+    }
+    if (credits.length === 0) {
+      setError("Aucun crédit à comparer.");
+      return;
+    }
+    setError('');
+    const avalancheResult = simulatePayoff(credits, extraPaymentsArray, 'avalanche');
+    const snowballResult = simulatePayoff(credits, extraPaymentsArray, 'boule de neige');
+    setComparison({ avalanche: avalancheResult, snowball: snowballResult });
+  };
+
+  const ResultCard: React.FC<{
+    title: string; 
+    result: PayoffResult; 
+    icon: React.ElementType; 
+    gradient: string;
+  }> = ({ title, result, icon: Icon, gradient }) => (
+    <div className={cn(
+      "rounded-xl p-4 shadow-lg border",
+      currentTheme.colors.card,
+      currentTheme.colors.border
+    )}>
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient}`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <h4 className={cn("font-bold text-lg", currentTheme.colors.text)}>{title}</h4>
+      </div>
+      <div className={cn("space-y-2", currentTheme.colors.text)}>
+        <p>
+          🏁 Libéré des dettes en : {' '}
+          <span className="font-bold">
+            {result.months < 0 
+              ? 'Erreur de calcul' 
+              : `${Math.floor(result.months / 12)} ans et ${result.months % 12} mois`}
+          </span>
+        </p>
+        <p>
+          💰 Total des intérêts payés : {' '}
+          <span className="font-bold">
+            {result.totalInterest < 0 ? 'N/A' : formaterMontant(result.totalInterest)}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+
+  const inputClass = cn(
+    "px-4 py-3 rounded-xl border-2 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200",
+    currentTheme.colors.input,
+    currentTheme.colors.border,
+    currentTheme.colors.text
+  );
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      
+      {/* Résumé des dettes */}
+      {credits.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="overflow-hidden relative border-none bg-gradient-to-br from-red-500 to-orange-500 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <CreditCard className="w-5 h-5 opacity-80" />
+                <span className="text-sm font-medium opacity-80">Total des dettes</span>
+              </div>
+              <div className="text-3xl font-bold">{formaterMontant(totalDettes)}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden relative border-none bg-gradient-to-br from-amber-500 to-yellow-500 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <TrendingDown className="w-5 h-5 opacity-80" />
+                <span className="text-sm font-medium opacity-80">Mensualités totales</span>
+              </div>
+              <div className="text-3xl font-bold">{formaterMontant(mensualitesTotales)}/mois</div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden relative border-none bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <AlertTriangle className="w-5 h-5 opacity-80" />
+                <span className="text-sm font-medium opacity-80">Nombre de crédits</span>
+              </div>
+              <div className="text-3xl font-bold">{credits.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Optimisation des dettes */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h2 className={cn("text-2xl font-bold mb-6 flex items-center gap-3", currentTheme.colors.text)}>
+          <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl">
+            <TrendingDown className="w-6 h-6 text-white" />
+          </div>
+          Optimisation des Dettes
+        </h2>
+
+        {/* Sélection de stratégie */}
+        <div className="mb-6">
+          <div className={cn(
+            "flex justify-center rounded-xl p-1",
+            currentTheme.isDark ? "bg-slate-700" : "bg-gray-200"
+          )}>
+            <button
+              onClick={() => setStrategieDette('avalanche')}
+              className={cn(
+                "w-1/2 py-2 px-4 rounded-lg font-semibold transition-all",
+                strategieDette === 'avalanche' 
+                  ? cn("shadow", currentTheme.colors.card, currentTheme.colors.text)
+                  : currentTheme.colors.subtext
+              )}
+            >
+              Avalanche (Taux élevés)
+            </button>
+            <button
+              onClick={() => setStrategieDette('boule de neige')}
+              className={cn(
+                "w-1/2 py-2 px-4 rounded-lg font-semibold transition-all",
+                strategieDette === 'boule de neige'
+                  ? cn("shadow", currentTheme.colors.card, currentTheme.colors.text)
+                  : currentTheme.colors.subtext
+              )}
+            >
+              Boule de Neige (Petits soldes)
+            </button>
+          </div>
+          
+          <div className={cn(
+            "mt-4 p-3 rounded-lg flex items-start gap-3 text-sm",
+            currentTheme.isDark 
+              ? "bg-indigo-900/30 border border-indigo-800/30 text-indigo-300"
+              : "bg-indigo-50 border border-indigo-200 text-indigo-800"
+          )}>
+            <Info className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            {strategieDette === 'avalanche' 
+              ? "La méthode Avalanche priorise les dettes avec les taux d'intérêt les plus élevés, vous faisant économiser le plus d'argent sur le long terme."
+              : "La méthode Boule de Neige priorise les plus petites dettes pour obtenir des victoires rapides et rester motivé."}
+          </div>
+        </div>
+
+        {/* Liste des dettes optimisées */}
+        <div className="space-y-4">
+          <h3 className={cn("text-lg font-semibold", currentTheme.colors.text)}>
+            Ordre de remboursement suggéré :
+          </h3>
+          {dettesOptimisees.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <CreditCard className={cn("w-12 h-12 mb-3 opacity-30", currentTheme.colors.subtext)} />
+              <p className={cn("text-center", currentTheme.colors.subtext)}>
+                Aucun crédit à optimiser.
+              </p>
+              <p className={cn("text-center text-sm", currentTheme.colors.subtext)}>
+                Ajoutez des crédits dans l&apos;onglet Dépenses pour voir les optimisations.
+              </p>
+            </div>
+          )}
+          {dettesOptimisees.map((dette, index) => (
+            <div
+              key={dette.id}
+              className={cn(
+                "p-4 border rounded-xl flex items-center gap-4",
+                currentTheme.colors.card,
+                currentTheme.colors.border
+              )}
+            >
+              <div className="flex-shrink-0 w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xl font-bold">
+                {index + 1}
+              </div>
+              <div className="flex-grow">
+                <p className={cn("font-bold", currentTheme.colors.text)}>{dette.nom}</p>
+                <div className={cn("text-sm flex flex-wrap gap-x-2", currentTheme.colors.subtext)}>
+                  <span>Mensualité: {formaterMontant(parseFloat(dette.montant))}</span>
+                  <span>|</span>
+                  <span>Total restant: {formaterMontant(parseFloat(dette.montantTotal || '0'))}</span>
+                  <span>|</span>
+                  <span>Taux: {dette.tauxInteret || 'N/A'}%</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Comparateur de stratégies */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h3 className={cn("text-xl font-bold mb-4 flex items-center gap-2", currentTheme.colors.text)}>
+          <Calculator className="w-5 h-5" /> Comparateur de Stratégies
+        </h3>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <input
+            type="text"
+            value={extraPayment}
+            onChange={(e) => setExtraPayment(e.target.value)}
+            placeholder="€ extra / mois (ex: 100, 150, 200)"
+            className={cn("flex-grow", inputClass)}
+          />
+          <button
+            onClick={handleComparison}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:opacity-90 shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            Comparer
+          </button>
+        </div>
+        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+        
+        {comparison && (
+          <div className="mt-6 animate-fadeIn">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ResultCard 
+                title="Stratégie Avalanche" 
+                result={comparison.avalanche} 
+                icon={Zap} 
+                gradient="from-red-500 to-pink-500" 
+              />
+              <ResultCard 
+                title="Stratégie Boule de Neige" 
+                result={comparison.snowball} 
+                icon={Shield} 
+                gradient="from-emerald-500 to-teal-500" 
+              />
+            </div>
+            {comparison.avalanche.totalInterest >= 0 && 
+             comparison.snowball.totalInterest >= 0 && 
+             comparison.snowball.totalInterest > comparison.avalanche.totalInterest && (
+              <div className={cn(
+                "mt-4 p-3 rounded-lg text-sm text-center",
+                currentTheme.isDark 
+                  ? "bg-green-900/30 border border-green-800/30 text-green-300"
+                  : "bg-green-50 border border-green-200 text-green-800"
+              )}>
+                L&apos;Avalanche vous fait économiser{' '}
+                <span className="font-bold">
+                  {formaterMontant(comparison.snowball.totalInterest - comparison.avalanche.totalInterest)}
+                </span>{' '}
+                d&apos;intérêts !
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ============================================================================
-// FILE: app/(main)/debts/page.tsx
+// FILE: app/(main)/goals/page.tsx
 // ============================================================================
 
-// app/(main)/debts/page.tsx (NEW FILE)
-import { getDebts } from "@/lib/actions/debt.actions";
-import { AddDebtDialog } from "@/components/debts/add-debt-dialog";
-import { DebtCard } from "@/components/debts/debt-card";
-import { DebtAiAnalysis } from "@/components/debts/debt-ai-analysis";
-import { Empty } from "@/components/ui/empty";
-import { CreditCard } from "lucide-react";
+'use client';
 
-export default async function DebtsPage() {
-  const debts = await getDebts();
+import React, { useState } from 'react';
+import { Trash2, Target } from 'lucide-react'; // PlusCircle and AlertTriangle were unused in render
+import type { Objectif } from '@/types';
+import { formaterMontant } from '@/utils/financeCalculations';
+import { CADEAUX_OBJECTIFS } from '@/constants';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { cn } from '@/lib/utils';
+import { Empty } from '@/components/ui/empty';
+import { AddGoalDialog } from '@/components/goals/add-goal-dialog';
+
+export default function GoalsPage() {
+  const { objectifs, setObjectifs } = useFinanceData();
+  const [nouvelObjectif, setNouvelObjectif] = useState({ nom: '', montantCible: '', montantActuel: '0' });
+  const [error, setError] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const { currentTheme } = useTheme();
+
+  const ajouterObjectif = () => {
+    const cible = parseFloat(nouvelObjectif.montantCible);
+    const actuel = parseFloat(nouvelObjectif.montantActuel);
+
+    if (!nouvelObjectif.nom.trim()) {
+      setError("Le nom de l'objectif est requis.");
+      return;
+    }
+    if (isNaN(cible) || cible <= 0) {
+      setError("Le montant cible doit être un nombre positif.");
+      return;
+    }
+    if (isNaN(actuel) || actuel < 0) {
+      setError("Le montant actuel est invalide.");
+      return;
+    }
+    if (actuel > cible) {
+      setError("Le montant actuel ne peut pas dépasser le montant cible.");
+      return;
+    }
+    setError('');
+    setObjectifs([...objectifs, { ...nouvelObjectif, id: Date.now() }]);
+    setNouvelObjectif({ nom: '', montantCible: '', montantActuel: '0' });
+  };
+
+  const confirmerSuppression = (id: number) => {
+    setDeleteConfirmId(id);
+  };
+
+  // Note: These functions were defined but not fully utilized in the UI (modal logic missing),
+  // but kept to maintain original logic.
+  const annulerSuppression = () => {
+    setDeleteConfirmId(null);
+  };
+
+  const executerSuppression = () => {
+    if (deleteConfirmId !== null) {
+      setObjectifs(objectifs.filter(o => o.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const mettreAJourObjectif = (id: number, nouveauMontant: string) => {
+    const obj = objectifs.find(o => o.id === id);
+    if (!obj) return;
+    
+    const montantNum = parseFloat(nouveauMontant);
+    if (isNaN(montantNum) || montantNum < 0 || montantNum > parseFloat(obj.montantCible)) {
+      return;
+    }
+    setObjectifs(objectifs.map(o => o.id === id ? { ...o, montantActuel: nouveauMontant } : o));
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
-          Debt Management
+        <h1 className="text-2xl font-semibold leading-none tracking-tight font-roboto">
+          Financial Goals
         </h1>
-        <AddDebtDialog />
+        <AddGoalDialog />
       </div>
 
-      {debts.length > 0 && <DebtAiAnalysis debts={debts} />}
+      {/* FIXED: Added ternary start here */}
+      {objectifs.length > 0 ? (
+        <div className={cn(
+          "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+          currentTheme.colors.card,
+          currentTheme.colors.border
+        )}>
+          <h3 className={cn("text-xl font-bold mb-4", currentTheme.colors.text)}>
+            Mes objectifs ({objectifs.length})
+          </h3>
+          <div className="space-y-4">
+            {objectifs.map(obj => {
+              const montantActuel = parseFloat(obj.montantActuel) || 0;
+              const montantCible = parseFloat(obj.montantCible) || 1;
+              const progression = Math.min(100, (montantActuel / montantCible) * 100);
+              const cadeauxDebloques = CADEAUX_OBJECTIFS.filter(cadeau => progression >= cadeau.pourcentage);
 
-      {debts.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {debts.map((debt) => (
-            <DebtCard key={debt.id} debt={debt} />
-          ))}
+              return (
+                <div
+                  key={obj.id}
+                  className={cn(
+                    "p-4 rounded-xl border",
+                    currentTheme.colors.border,
+                    currentTheme.isDark ? "bg-slate-800/40" : "bg-gray-50"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={cn("font-bold", currentTheme.colors.text)}>{obj.nom}</span>
+                    {/* Direct delete for simplicity based on provided UI, can be swapped for Confirm Dialog */}
+                    <button
+                      onClick={() => executerSuppression()} 
+                      onMouseDown={() => confirmerSuppression(obj.id)}
+                      className="p-2 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className={cn("text-sm mb-2", currentTheme.colors.subtext)}>
+                    {formaterMontant(montantActuel)} / {formaterMontant(montantCible)}
+                  </div>
+                  <div className={cn("w-full rounded-full h-4", currentTheme.isDark ? "bg-slate-700" : "bg-gray-200")}>
+                    <div
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-4 rounded-full text-center text-white text-xs font-bold flex items-center justify-center transition-all duration-500"
+                      style={{ width: `${Math.max(progression, 10)}%` }}
+                    >
+                      {progression.toFixed(0)}%
+                    </div>
+                  </div>
+
+                  {/* Récompenses débloquées */}
+                  {cadeauxDebloques.length > 0 && (
+                    <div className={cn("mt-4 pt-4 border-t", currentTheme.colors.border)}>
+                      <h4 className={cn("font-semibold mb-2", currentTheme.colors.text)}>
+                        Récompenses débloquées
+                      </h4>
+                      <div className="flex flex-wrap gap-4">
+                        {cadeauxDebloques.map(cadeau => {
+                          const Icon = cadeau.icon;
+                          return (
+                            <div
+                              key={cadeau.nom}
+                              className={`relative overflow-hidden flex-1 min-w-[150px] p-4 rounded-xl bg-gradient-to-br ${cadeau.gradient} text-white shadow-lg flex flex-col items-center justify-center`}
+                            >
+                              <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                                <Icon className="w-24 h-24" />
+                              </div>
+                              <div className="relative text-center">
+                                <div className="flex justify-center mb-2">
+                                  <Icon className="w-10 h-10" />
+                                </div>
+                                <div className="font-bold text-lg">{cadeau.nom}</div>
+                                <p className="text-xs text-white/90">{cadeau.description}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mise à jour du montant */}
+                  <div className="mt-4">
+                    <label className={cn("text-xs", currentTheme.colors.subtext)}>
+                      Mettre à jour le montant actuel:
+                    </label>
+                    <input
+                      type="number"
+                      value={obj.montantActuel}
+                      onChange={(e) => mettreAJourObjectif(obj.id, e.target.value)}
+                      className={cn(
+                        "w-full mt-1 px-3 py-2 text-sm rounded-lg border outline-none transition-all focus:border-purple-500",
+                        currentTheme.colors.input,
+                        currentTheme.colors.border,
+                        currentTheme.colors.text
+                      )}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <Empty>
-          <CreditCard className="h-12 w-12 text-muted-foreground" />
+          <Target className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
-            <h3 className="text-lg font-semibold">No Debts Found</h3>
+            <h3 className="text-lg font-semibold font-roboto">No Goals Yet</h3>
             <p className="text-muted-foreground text-sm mt-1">
-              Track your loans and credit cards to get a clear repayment plan.
+              Setting goals is the first step to financial freedom.
             </p>
           </div>
         </Empty>
@@ -805,102 +1845,367 @@ export default async function DebtsPage() {
 }
 
 // ============================================================================
-// FILE: app/(main)/goals/page.tsx
-// ============================================================================
-
-// ============================================================================
-// FILE: app/(main)/goals/page.tsx
-// ============================================================================
-import { GoalCard } from "@/components/goals/goal-card";
-import { Empty } from "@/components/ui/empty";
-import { Target } from "lucide-react";
-
-export default async function GoalsPage() {
-  const goals = await getGoals();
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
-          Financial Goals
-        </h1>
-        <AddGoalDialog />
-      </div>
-
-      {goals.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
-        </div>
-      ) : (
-        <Empty>
-            <Target className="h-12 w-12 text-muted-foreground" />
-            <div className="text-center">
-                <h3 className="text-lg font-semibold">No Goals Yet</h3>
-                <p className="text-muted-foreground text-sm mt-1">Setting goals is the first step to financial freedom.</p>
-            </div>
-        </Empty>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
 // FILE: app/(main)/investments/page.tsx
 // ============================================================================
 
-// ============================================================================
-// FILE: app/(main)/investments/page.tsx
-// ============================================================================
+'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InvestmentsTable } from "@/components/investments/investment-table";
-import { AddInvestmentDialog } from "@/components/investments/add-investment-dialog";
-import { getInvestments } from "@/lib/actions/investment.actions";
+import React, { useState, useMemo } from 'react';
+import { 
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  AreaChart, Area, PieChart, Pie, Cell 
+} from 'recharts';
+import { 
+  TrendingUp, PlusCircle, Bitcoin, Briefcase, Trash2, Activity
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import type { Investment, InvestmentType } from '@/types';
+import { cn } from '@/lib/utils';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { formaterMontant } from '@/utils/financeCalculations';
 
-export default async function InvestmentsPage() {
-  const investments = await getInvestments();
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+export default function InvestmentsPage() {
+  const { currentTheme } = useTheme();
+  const { investissements, setInvestissements } = useFinanceData();
   
-  const totalValue = investments.reduce((sum, inv) => sum + (inv.quantity * inv.purchasePrice), 0);
+  const [newAsset, setNewAsset] = useState<Partial<Investment>>({
+    symbol: '', name: '', quantity: 0, averageBuyPrice: 0, currentPrice: 0, type: 'stock'
+  });
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // --- CALCULS ---
+  
+  const portfolioMetrics = useMemo(() => {
+    let totalValue = 0;
+    let totalCost = 0;
+    const allocation: Record<string, number> = {};
+
+    investissements.forEach(inv => {
+      const value = inv.quantity * inv.currentPrice;
+      const cost = inv.quantity * inv.averageBuyPrice;
+      totalValue += value;
+      totalCost += cost;
+      allocation[inv.type] = (allocation[inv.type] || 0) + value;
+    });
+
+    const plValue = totalValue - totalCost;
+    const plPercent = totalCost > 0 ? (plValue / totalCost) * 100 : 0;
+    const dailyVarPercent = investissements.length > 0 ? (Math.random() * 3) - 1.5 : 0;
+    const dailyVarValue = totalValue * (dailyVarPercent / 100);
+
+    return { totalValue, totalCost, plValue, plPercent, dailyVarValue, dailyVarPercent, allocation };
+  }, [investissements]);
+
+  const allocationData = Object.entries(portfolioMetrics.allocation).map(([key, value]) => ({
+    name: key.charAt(0).toUpperCase() + key.slice(1),
+    value
+  }));
+
+  // Mock History Data for Benchmark Chart
+  const historyData = useMemo(() => {
+    if (portfolioMetrics.totalValue === 0) return [];
+    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+    const data = [];
+    let currentVal = portfolioMetrics.totalCost;
+    let sp500Val = portfolioMetrics.totalCost;
+
+    for (let i = 0; i < 12; i++) {
+      const change = (Math.random() * 10 - 4) / 100;
+      const spChange = (Math.random() * 6 - 2) / 100;
+      
+      currentVal = currentVal * (1 + change);
+      sp500Val = sp500Val * (1 + spChange);
+
+      data.push({
+        name: months[i],
+        Portfolio: currentVal,
+        SP500: sp500Val
+      });
+    }
+    data[data.length - 1].Portfolio = portfolioMetrics.totalValue;
+    
+    return data;
+  }, [portfolioMetrics.totalCost, portfolioMetrics.totalValue]);
+
+  // --- HANDLERS ---
+
+  const handleAddAsset = () => {
+    if (!newAsset.symbol || !newAsset.name) return;
+    const asset: Investment = {
+      id: Date.now().toString(),
+      symbol: newAsset.symbol.toUpperCase(),
+      name: newAsset.name,
+      type: newAsset.type as InvestmentType,
+      quantity: Number(newAsset.quantity),
+      averageBuyPrice: Number(newAsset.averageBuyPrice),
+      currentPrice: Number(newAsset.currentPrice)
+    };
+    setInvestissements([...investissements, asset]);
+    setNewAsset({ symbol: '', name: '', quantity: 0, averageBuyPrice: 0, currentPrice: 0, type: 'stock' });
+    setIsFormOpen(false);
+  };
+
+  const handleDelete = (id: string) => {
+    setInvestissements(prev => prev.filter(i => i.id !== id));
+  };
+
+  const inputClass = cn(
+    "w-full h-10 rounded-xl border px-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200",
+    currentTheme.colors.input,
+    currentTheme.colors.border,
+    currentTheme.colors.text
+  );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">Portfolio</h1>
-        <AddInvestmentDialog />
+    <div className="space-y-8 animate-fadeIn pb-12">
+      
+      {/* Hero Section - Portfolio Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Value */}
+        <Card className="md:col-span-2 overflow-hidden relative border-none bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+          <div className="absolute top-0 right-0 p-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 p-20 bg-purple-500/10 rounded-full blur-3xl"></div>
+          <CardContent className="relative z-10 p-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-slate-400 text-sm font-medium mb-1 uppercase tracking-wider">Valeur Totale</div>
+                <h2 className="text-5xl font-bold mb-4">{formaterMontant(portfolioMetrics.totalValue)}</h2>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <Badge className={`${portfolioMetrics.plValue >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'} border-none px-3 py-1`}>
+                    {portfolioMetrics.plValue >= 0 ? '+' : ''}{formaterMontant(portfolioMetrics.plValue)} ({portfolioMetrics.plPercent.toFixed(2)}%)
+                    <span className="ml-1 text-xs opacity-70">Total</span>
+                  </Badge>
+                  <Badge className={`${portfolioMetrics.dailyVarValue >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'} border-none px-3 py-1`}>
+                    {portfolioMetrics.dailyVarValue >= 0 ? '+' : ''}{formaterMontant(portfolioMetrics.dailyVarValue)} (24h)
+                  </Badge>
+                </div>
+              </div>
+              <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md">
+                <Activity className="w-8 h-8 text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Allocation Mini Chart */}
+        <Card className="flex flex-col justify-center items-center">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Allocation</CardTitle>
+          </CardHeader>
+          <CardContent className="w-full h-[150px]">
+            {investissements.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={allocationData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
+                    {allocationData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(val) => formaterMontant(Number(val))} 
+                    contentStyle={{borderRadius: '8px', border: 'none', background: '#1e293b', color: '#fff'}} 
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 text-xs">Aucune donnée</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-           <CardHeader className="pb-2">
-             <CardTitle className="text-sm font-medium">Total Portfolio Value</CardTitle>
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalValue)}</div>
-           </CardContent>
-        </Card>
-        <Card>
-           <CardHeader className="pb-2">
-             <CardTitle className="text-sm font-medium">Total Holdings</CardTitle>
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold">{investments.length}</div>
-           </CardContent>
-        </Card>
-      </div>
-
+      {/* Chart Section: Portfolio vs Benchmark */}
       <Card>
         <CardHeader>
-          <CardTitle>Your Investments</CardTitle>
-          <CardDescription>Track your stocks, crypto, and assets.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-blue-500"/> Performance vs Marché (S&P 500)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          {investissements.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPort" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorSP" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#82ca9d" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: currentTheme.colors.chartText, fontSize: 12}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: currentTheme.colors.chartText, fontSize: 12}} tickFormatter={(val) => `${val/1000}k€`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
+                <Tooltip 
+                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} 
+                  formatter={(val) => formaterMontant(Number(val))}
+                />
+                <Area type="monotone" dataKey="Portfolio" stroke="#8884d8" fillOpacity={1} fill="url(#colorPort)" strokeWidth={2} />
+                <Area type="monotone" dataKey="SP500" stroke="#82ca9d" fillOpacity={1} fill="url(#colorSP)" strokeWidth={2} strokeDasharray="5 5" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <TrendingUp className="w-12 h-12 mb-2 opacity-20"/>
+              <p>Ajoutez des actifs pour voir la comparaison</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Assets List & Add Form */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Mes Actifs</CardTitle>
+          <Button 
+            onClick={() => setIsFormOpen(!isFormOpen)} 
+            size="sm" 
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90"
+          >
+            {isFormOpen ? 'Fermer' : <><PlusCircle className="w-4 h-4 mr-2"/> Ajouter un actif</>}
+          </Button>
         </CardHeader>
         <CardContent>
-            {investments.length > 0 ? (
-                <InvestmentsTable investments={investments} />
-            ) : (
-                <p className="text-muted-foreground text-sm">No investments tracked yet.</p>
+          {/* Add Form */}
+          {isFormOpen && (
+            <div className={cn(
+              "mb-6 p-4 rounded-xl border animate-fadeIn",
+              currentTheme.colors.card,
+              currentTheme.colors.border
+            )}>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>Type</label>
+                  <select 
+                    className={inputClass}
+                    value={newAsset.type}
+                    onChange={(e) => setNewAsset({...newAsset, type: e.target.value as InvestmentType})}
+                  >
+                    <option value="stock">Action</option>
+                    <option value="etf">ETF</option>
+                    <option value="crypto">Crypto</option>
+                  </select>
+                </div>
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>Symbole</label>
+                  <Input 
+                    placeholder="AAPL" 
+                    value={newAsset.symbol} 
+                    onChange={(e) => setNewAsset({...newAsset, symbol: e.target.value})} 
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>Nom</label>
+                  <Input 
+                    placeholder="Apple Inc." 
+                    value={newAsset.name} 
+                    onChange={(e) => setNewAsset({...newAsset, name: e.target.value})} 
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>Quantité</label>
+                  <Input 
+                    type="number" 
+                    placeholder="10" 
+                    value={newAsset.quantity || ''} 
+                    onChange={(e) => setNewAsset({...newAsset, quantity: Number(e.target.value)})} 
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>PRU (€)</label>
+                  <Input 
+                    type="number" 
+                    placeholder="150" 
+                    value={newAsset.averageBuyPrice || ''} 
+                    onChange={(e) => setNewAsset({...newAsset, averageBuyPrice: Number(e.target.value)})} 
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className={cn("text-xs font-medium mb-1 block", currentTheme.colors.subtext)}>Prix actuel</label>
+                  <Input 
+                    type="number" 
+                    placeholder="175" 
+                    value={newAsset.currentPrice || ''} 
+                    onChange={(e) => setNewAsset({...newAsset, currentPrice: Number(e.target.value)})} 
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <Button onClick={handleAddAsset} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600">
+                  Ajouter l&apos;actif
+                </Button>
+                <p className={cn("text-[10px] mt-2 text-center", currentTheme.colors.subtext)}>
+                  Dans cette démo, entrez le prix actuel manuellement.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* List */}
+          <div className="space-y-3">
+            {investissements.length === 0 && (
+              <p className={cn("text-center py-8", currentTheme.colors.subtext)}>
+                Aucun investissement. Cliquez sur &quot;Ajouter un actif&quot; pour commencer.
+              </p>
             )}
+            {investissements.map((inv) => {
+              const val = inv.quantity * inv.currentPrice;
+              const gain = val - (inv.quantity * inv.averageBuyPrice);
+              const gainPercent = inv.quantity * inv.averageBuyPrice > 0 
+                ? ((gain / (inv.quantity * inv.averageBuyPrice)) * 100) 
+                : 0;
+
+              return (
+                <div 
+                  key={inv.id} 
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-xl border transition-all hover:shadow-md",
+                    currentTheme.isDark ? "bg-slate-800/50" : "bg-white/50",
+                    currentTheme.colors.border
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${inv.type === 'crypto' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {inv.type === 'crypto' ? <Bitcoin className="w-5 h-5"/> : <Briefcase className="w-5 h-5"/>}
+                    </div>
+                    <div>
+                      <div className={cn("font-bold", currentTheme.colors.text)}>{inv.symbol}</div>
+                      <div className={cn("text-xs", currentTheme.colors.subtext)}>{inv.name} • {inv.quantity} unités</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6">
+                    <div className="text-right hidden sm:block">
+                      <div className={cn("text-xs", currentTheme.colors.subtext)}>Prix: {formaterMontant(inv.currentPrice)}</div>
+                      <div className={cn("text-xs", currentTheme.colors.subtext)}>PRU: {formaterMontant(inv.averageBuyPrice)}</div>
+                    </div>
+                    <div className="text-right min-w-[100px]">
+                      <div className={cn("font-bold", currentTheme.colors.text)}>{formaterMontant(val)}</div>
+                      <div className={`text-xs font-medium ${gain >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {gain >= 0 ? '+' : ''}{gainPercent.toFixed(2)}%
+                      </div>
+                    </div>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => handleDelete(inv.id)} 
+                      className="text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -911,14 +2216,14 @@ export default async function InvestmentsPage() {
 // FILE: app/(main)/layout.tsx
 // ============================================================================
 
-// app/(main)/layout.tsx
-
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar"; // MODIFICATION: Import SidebarRail
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { HeaderMain } from "@/components/layout/header-main";
+import { FinanceDataProvider } from '@/context/FinanceDataContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 export default async function MainLayout({
   children,
@@ -932,17 +2237,410 @@ export default async function MainLayout({
   }
 
   return (
-    // MODIFICATION: Added collapsible="icon" to enable the interactive collapse feature
-    <SidebarProvider collapsible="icon"> 
-      <div className="flex min-h-screen w-full"> {/* MODIFICATION: Added w-full */}
-        <Sidebar user={session.user} />
-        <SidebarRail /> {/* MODIFICATION: Added the rail component */}
-        <SidebarInset>
-          <HeaderMain user={session.user} />
-          <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
-        </SidebarInset>
+    <ThemeProvider>
+      <FinanceDataProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full">
+            <Sidebar user={session.user} />
+            <SidebarRail />
+            <SidebarInset>
+              <HeaderMain user={session.user} />
+              <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </FinanceDataProvider>
+    </ThemeProvider>
+  );
+}
+
+// ============================================================================
+// FILE: app/(main)/pass-elite/page.tsx
+// ============================================================================
+
+'use client';
+
+import React, { useState } from 'react';
+import { Crown, Lock, Check, Gift, Coins, Sparkles, Star } from 'lucide-react';
+import { SEASON_LEVELS } from '@/constants';
+import type { Reward } from '@/types';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+export default function PassElitePage() {
+  const { gameState, setGameState } = useFinanceData();
+  const { currentTheme } = useTheme();
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+
+  const nextLevel = SEASON_LEVELS.find(l => l.level === gameState.level + 1) || SEASON_LEVELS[SEASON_LEVELS.length - 1];
+  const progressPercent = Math.min(100, (gameState.xp / nextLevel.xpRequired) * 100);
+
+  const handleClaim = (reward: Reward) => {
+    if (gameState.claimedRewards.includes(reward.id)) return;
+    
+    let newCoins = gameState.coins;
+    const newUnlockedFeatures = [...gameState.unlockedFeatures];
+
+    if (reward.type === 'coin') {
+      newCoins += Number(reward.value);
+    } else if (reward.type === 'feature') {
+      newUnlockedFeatures.push(String(reward.value));
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      coins: newCoins,
+      unlockedFeatures: newUnlockedFeatures,
+      claimedRewards: [...prev.claimedRewards, reward.id]
+    }));
+  };
+
+  const handleBuyPremium = () => {
+    setTimeout(() => {
+      setGameState(prev => ({ ...prev, isPremium: true }));
+      setShowPremiumModal(false);
+    }, 1000);
+  };
+
+  const renderRewardButton = (reward: Reward, isUnlocked: boolean) => {
+    const isClaimed = gameState.claimedRewards.includes(reward.id);
+    const isFeature = reward.type === 'feature';
+
+    return (
+      <div className="relative">
+        <Button 
+          size="sm" 
+          variant={isClaimed ? "outline" : isFeature ? "default" : "secondary"}
+          disabled={!isUnlocked || isClaimed}
+          onClick={() => handleClaim(reward)}
+          className={cn(
+            "h-8 text-xs px-3",
+            !isUnlocked && 'opacity-50 cursor-not-allowed',
+            isFeature && !isClaimed && 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-none hover:opacity-90 shadow-md'
+          )}
+        >
+          {isClaimed && <Check className="w-3 h-3 mr-1"/>}
+          {isClaimed ? 'Reçu' : isFeature ? 'Débloquer' : 'Réclamer'}
+        </Button>
+        {isFeature && !isClaimed && isUnlocked && (
+          <span className="absolute -top-2 -right-2 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+          </span>
+        )}
       </div>
-    </SidebarProvider>
+    );
+  };
+
+  return (
+    <div className="space-y-8 animate-fadeIn pb-12">
+      
+      {/* Header Section */}
+      <div className="relative overflow-hidden rounded-3xl p-8 shadow-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="text-center md:text-left">
+            <div className="flex items-center gap-2 mb-2 justify-center md:justify-start">
+              <Badge className="bg-amber-500 text-black font-bold border-none">
+                <Crown className="w-3 h-3 mr-1"/> SAISON 1
+              </Badge>
+              <span className="text-slate-300 text-sm">Fin dans 24 jours</span>
+            </div>
+            <h2 className="text-4xl font-bold mb-2">Pass Finance Elite</h2>
+            <p className="text-indigo-200 max-w-md">
+              Complétez des quêtes, gagnez de l&apos;XP et débloquez des{' '}
+              <strong className="text-white">fonctionnalités exclusives</strong>{' '}
+              (Export CSV, Graphiques Avancés) pour booster votre gestion.
+            </p>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/20 min-w-[200px] text-center">
+            <div className="text-xs text-indigo-200 uppercase tracking-wider font-semibold mb-1">Niveau Actuel</div>
+            <div className="text-5xl font-black text-white mb-2">{gameState.level}</div>
+            <div className="text-xs text-indigo-200 mb-2">{gameState.xp} / {nextLevel.xpRequired} XP</div>
+            <div className="w-full h-3 bg-black/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500" 
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quests Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-4">
+          <h3 className={cn("text-xl font-bold flex items-center gap-2", currentTheme.colors.text)}>
+            <Star className="w-5 h-5 text-amber-500 fill-amber-500"/> Quêtes Quotidiennes
+          </h3>
+          {gameState.quests.map(quest => (
+            <Card 
+              key={quest.id} 
+              className={cn(
+                "border-l-4",
+                quest.completed 
+                  ? "border-l-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" 
+                  : "border-l-indigo-500"
+              )}
+            >
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className={cn(
+                    "font-bold",
+                    quest.completed ? "text-emerald-800 dark:text-emerald-400" : currentTheme.colors.text
+                  )}>
+                    {quest.title}
+                  </h4>
+                  {quest.completed && <Check className="w-5 h-5 text-emerald-600" />}
+                </div>
+                <p className={cn("text-sm mb-3", currentTheme.colors.subtext)}>{quest.description}</p>
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <div className="flex gap-2">
+                    <span className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 px-2 py-1 rounded flex items-center gap-1">
+                      <Sparkles className="w-3 h-3"/> {quest.xpReward} XP
+                    </span>
+                    <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 px-2 py-1 rounded flex items-center gap-1">
+                      <Coins className="w-3 h-3"/> {quest.coinReward}
+                    </span>
+                  </div>
+                  <span className={currentTheme.colors.subtext}>{quest.progress} / {quest.target}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* The Pass Track */}
+        <div className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={cn("text-xl font-bold flex items-center gap-2", currentTheme.colors.text)}>
+              <Gift className="w-5 h-5 text-purple-500"/> Progression & Récompenses
+            </h3>
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1 rounded-full shadow-sm border",
+              currentTheme.colors.card,
+              currentTheme.colors.border
+            )}>
+              <Coins className="w-4 h-4 text-amber-500" />
+              <span className={cn("font-bold", currentTheme.colors.text)}>{gameState.coins}</span>
+            </div>
+          </div>
+          
+          <div className={cn(
+            "rounded-2xl border shadow-xl overflow-x-auto",
+            currentTheme.colors.card,
+            currentTheme.colors.border
+          )}>
+            <div className="min-w-[800px] p-6">
+              
+              {/* Headers */}
+              <div className="grid grid-cols-10 gap-4 mb-4 px-12">
+                <div className="col-span-10 flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  <span>Débutant</span>
+                  <span>Expert</span>
+                  <span>Légende</span>
+                </div>
+              </div>
+
+              {/* Free Track */}
+              <div className="flex items-center gap-4 mb-8 relative pl-12 pr-12">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 font-bold text-slate-500 text-[10px] uppercase tracking-widest w-24 text-center origin-center">
+                  Gratuit
+                </div>
+                <div className={cn(
+                  "absolute left-12 right-12 top-1/2 h-2 -z-10 rounded-full",
+                  currentTheme.isDark ? "bg-slate-700" : "bg-slate-200"
+                )}></div>
+                
+                {SEASON_LEVELS.map((lvl) => {
+                  const isUnlocked = gameState.level >= lvl.level;
+                  const reward = lvl.freeReward;
+                  const RewardIcon = reward?.icon;
+                  
+                  return (
+                    <div key={`free-${lvl.level}`} className="flex-1 flex flex-col items-center gap-3 min-w-[60px]">
+                      <div className={cn(
+                        "relative group w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
+                        isUnlocked 
+                          ? "border-emerald-500 bg-white dark:bg-slate-800 shadow-md" 
+                          : "border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700",
+                        reward?.type === 'feature' && "ring-2 ring-indigo-300 ring-offset-2"
+                      )}>
+                        {reward && RewardIcon ? (
+                          <>
+                            <RewardIcon className={cn(
+                              "w-6 h-6",
+                              isUnlocked 
+                                ? (reward.type === 'feature' ? 'text-indigo-600' : 'text-emerald-600') 
+                                : 'text-slate-400'
+                            )} />
+                            {reward.description && (
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-32 p-2 bg-slate-800 text-white text-xs rounded-lg z-50 text-center">
+                                {reward.description}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                              </div>
+                            )}
+                          </>
+                        ) : <div className="w-2 h-2 bg-slate-300 rounded-full"></div>}
+                      </div>
+                      {reward && renderRewardButton(reward, isUnlocked)}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Premium Track */}
+              <div className="flex items-center gap-4 relative pl-12 pr-12 mt-8">
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 font-bold text-amber-600 text-[10px] uppercase tracking-widest w-24 text-center origin-center">
+                  Elite
+                  {!gameState.isPremium && <Lock className="w-3 h-3 inline-block ml-1"/>}
+                </div>
+                <div className="absolute left-12 right-12 top-1/2 h-2 bg-gradient-to-r from-amber-200 to-orange-200 dark:from-amber-900/50 dark:to-orange-900/50 -z-10 rounded-full"></div>
+                
+                {SEASON_LEVELS.map((lvl) => {
+                  const isUnlocked = gameState.level >= lvl.level;
+                  const canClaim = isUnlocked && gameState.isPremium;
+                  const reward = lvl.premiumReward;
+                  const RewardIcon = reward?.icon;
+
+                  return (
+                    <div key={`prem-${lvl.level}`} className="flex-1 flex flex-col items-center gap-3 min-w-[60px]">
+                      <div className={cn(
+                        "relative group w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
+                        canClaim 
+                          ? "border-amber-500 bg-amber-50 dark:bg-amber-900/30 shadow-md" 
+                          : "border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700",
+                        reward?.type === 'feature' && "ring-2 ring-purple-300 ring-offset-2"
+                      )}>
+                        {!gameState.isPremium && (
+                          <div className="absolute inset-0 bg-black/5 rounded-xl flex items-center justify-center backdrop-blur-[1px]">
+                            <Lock className="w-4 h-4 text-slate-500/50"/>
+                          </div>
+                        )}
+                        {reward && RewardIcon ? (
+                          <>
+                            <RewardIcon className={cn(
+                              "w-6 h-6",
+                              canClaim 
+                                ? (reward.type === 'feature' ? 'text-purple-600' : 'text-amber-600') 
+                                : 'text-slate-400'
+                            )} />
+                            {reward.description && (
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-32 p-2 bg-slate-800 text-white text-xs rounded-lg z-50 text-center">
+                                {reward.description}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                              </div>
+                            )}
+                          </>
+                        ) : <div className="w-2 h-2 bg-slate-300 rounded-full"></div>}
+                      </div>
+                      {reward && renderRewardButton(reward, canClaim)}
+                      <div className="text-[10px] font-bold text-slate-400 mt-1">Niv {lvl.level}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Premium CTA */}
+          {!gameState.isPremium && (
+            <div className={cn(
+              "mt-6 p-6 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4",
+              currentTheme.isDark 
+                ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border-amber-800/30"
+                : "bg-gradient-to-r from-amber-100 to-orange-100 border-amber-200"
+            )}>
+              <div className="flex-1">
+                <h4 className={cn(
+                  "text-lg font-bold flex items-center gap-2",
+                  currentTheme.isDark ? "text-amber-400" : "text-amber-900"
+                )}>
+                  <Crown className="w-5 h-5"/> Débloquez le Pass Elite
+                </h4>
+                <p className={cn(
+                  "text-sm mt-1",
+                  currentTheme.isDark ? "text-amber-200" : "text-amber-800"
+                )}>
+                  Accédez à <strong>l&apos;analyse radar</strong>, aux <strong>thèmes exclusifs</strong> (Cyberpunk, Royal) et gagnez 3x plus de pièces.
+                </p>
+              </div>
+              <Button 
+                className="bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 whitespace-nowrap hover:opacity-90"
+                onClick={() => setShowPremiumModal(true)}
+              >
+                Débloquer pour 9.99€
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Premium Modal */}
+      {showPremiumModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <Card className="max-w-md w-full m-4 p-0 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white text-center">
+              <Crown className="w-12 h-12 mx-auto mb-3"/>
+              <h3 className="text-2xl font-bold">Pass Elite Finance</h3>
+              <p className="opacity-90">Passez au niveau supérieur</p>
+            </div>
+            <CardContent className="p-6 space-y-4">
+              <div className={cn(
+                "flex items-center gap-3 p-3 rounded-lg",
+                currentTheme.isDark ? "bg-slate-800" : "bg-slate-50"
+              )}>
+                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-full">
+                  <Check className="w-4 h-4 text-emerald-600"/>
+                </div>
+                <div className={cn("text-sm", currentTheme.colors.text)}>
+                  <strong>Graphiques Avancés :</strong> Visualisez vos finances en radar.
+                </div>
+              </div>
+              <div className={cn(
+                "flex items-center gap-3 p-3 rounded-lg",
+                currentTheme.isDark ? "bg-slate-800" : "bg-slate-50"
+              )}>
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-full">
+                  <Check className="w-4 h-4 text-purple-600"/>
+                </div>
+                <div className={cn("text-sm", currentTheme.colors.text)}>
+                  <strong>Thèmes Exclusifs :</strong> Cyberpunk & Royal.
+                </div>
+              </div>
+              <div className={cn(
+                "flex items-center gap-3 p-3 rounded-lg",
+                currentTheme.isDark ? "bg-slate-800" : "bg-slate-50"
+              )}>
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full">
+                  <Check className="w-4 h-4 text-amber-600"/>
+                </div>
+                <div className={cn("text-sm", currentTheme.colors.text)}>
+                  <strong>Badge &quot;Supporter&quot;</strong> sur votre profil.
+                </div>
+              </div>
+              
+              <div className="pt-4 flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => setShowPremiumModal(false)}>
+                  Annuler
+                </Button>
+                <Button className="flex-1 bg-slate-900 dark:bg-slate-100 dark:text-slate-900" onClick={handleBuyPremium}>
+                  Payer 9.99€
+                </Button>
+              </div>
+              <p className={cn("text-[10px] text-center", currentTheme.colors.subtext)}>
+                Ceci est une simulation. Aucun argent réel n&apos;est débité.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -950,39 +2648,383 @@ export default async function MainLayout({
 // FILE: app/(main)/patrimoine/page.tsx
 // ============================================================================
 
-// app/(main)/patrimoine/page.tsx (NEW FILE)
-import { getAssets } from "@/lib/actions/patrimoine.actions";
-import { AddAssetDialog } from "@/components/patrimoine/add-asset-dialog";
-import { AssetCard } from "@/components/patrimoine/asset-card";
-import { Empty } from "@/components/ui/empty";
-import { Home, PiggyBank } from "lucide-react";
+'use client';
 
-export default async function PatrimoinePage() {
-  const assets = await getAssets();
+import React, { useState, useMemo } from 'react';
+import { PlusCircle, Trash2, Wallet, AlertTriangle, TrendingUp, Home, PiggyBank, Car, Landmark } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import type { Actif } from '@/types';
+import { formaterMontant } from '@/utils/financeCalculations';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const ACTIF_TYPES = [
+  { value: 'immobilier', label: 'Immobilier', icon: Home, gradient: 'from-blue-500 to-indigo-500' },
+  { value: 'epargne', label: 'Épargne', icon: PiggyBank, gradient: 'from-emerald-500 to-teal-500' },
+  { value: 'vehicule', label: 'Véhicule', icon: Car, gradient: 'from-amber-500 to-orange-500' },
+  { value: 'autre', label: 'Autre', icon: Landmark, gradient: 'from-purple-500 to-pink-500' },
+];
+
+export default function PatrimoinePage() {
+  const { actifs, setActifs, depenses, patrimoineNet } = useFinanceData();
+  const [nouvelActif, setNouvelActif] = useState({ nom: '', valeur: '', type: 'epargne' });
+  const [error, setError] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const { currentTheme } = useTheme();
+
+  const ajouterActif = () => {
+    const valeurNum = parseFloat(nouvelActif.valeur);
+    if (!nouvelActif.nom.trim()) {
+      setError("Le nom de l'actif est requis.");
+      return;
+    }
+    if (isNaN(valeurNum) || valeurNum < 0) {
+      setError('Veuillez entrer une valeur valide et positive.');
+      return;
+    }
+    setError('');
+    setActifs([...actifs, { ...nouvelActif, id: Date.now() }]);
+    setNouvelActif({ nom: '', valeur: '', type: 'epargne' });
+  };
+
+  const confirmerSuppression = (id: number) => {
+    setDeleteConfirmId(id);
+  };
+
+  const annulerSuppression = () => {
+    setDeleteConfirmId(null);
+  };
+
+  const executerSuppression = () => {
+    if (deleteConfirmId !== null) {
+      setActifs(actifs.filter(a => a.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    }
+  };
+
+  // Calcul des dettes
+  // Calcul des dettes - FIX: handle undefined montantTotal
+const totalDettes = depenses
+  .filter(d => d.categorie === 'credit' && d.montantTotal)
+  .reduce((acc, d) => acc + (parseFloat(d.montantTotal || '0')), 0);
+
+  // Calcul du total des actifs
+  const totalActifs = actifs.reduce((acc, a) => acc + (parseFloat(a.valeur) || 0), 0);
+
+  // Historique du patrimoine net
+  const netWorthHistory = useMemo(() => {
+  const allItems = [
+    ...actifs.map(a => ({ date: new Date(a.id), amount: parseFloat(a.valeur) || 0 })),
+    ...depenses
+      .filter(d => d.categorie === 'credit' && d.montantTotal)
+      .map(d => ({ 
+        date: new Date(d.id), 
+        amount: -(parseFloat(d.montantTotal || '0'))  // FIX: handle undefined
+      }))
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+
+    if (allItems.length < 1) return [];
+
+    let cumulativeWorth = 0;
+    const dataPoints = [
+      { date: 'Début', 'Patrimoine Net': 0 }, 
+      ...allItems.map(item => {
+        cumulativeWorth += item.amount;
+        return {
+          date: item.date.toLocaleDateString('fr-FR', { month: 'short', day: '2-digit' }),
+          'Patrimoine Net': cumulativeWorth
+        };
+      })
+    ];
+    
+    return dataPoints;
+  }, [actifs, depenses]);
+
+  const inputClass = cn(
+    "px-4 py-3 rounded-xl border-2 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-200",
+    currentTheme.colors.input,
+    currentTheme.colors.border,
+    currentTheme.colors.text
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
-          Patrimoine (Assets)
-        </h1>
-        <AddAssetDialog />
+    <div className="space-y-6 animate-fadeIn relative">
+      
+      {/* Modal de confirmation */}
+      {deleteConfirmId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className={cn(
+            "rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 border transform transition-all scale-100",
+            currentTheme.colors.card,
+            currentTheme.colors.border
+          )}>
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className={cn("text-xl font-bold", currentTheme.colors.text)}>
+                Confirmer la suppression
+              </h3>
+              <p className={currentTheme.colors.subtext}>
+                Êtes-vous sûr de vouloir supprimer cet actif ?
+              </p>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={annulerSuppression}
+                  className={cn(
+                    "flex-1 px-4 py-2 rounded-xl border font-semibold transition-colors hover:opacity-80",
+                    currentTheme.colors.border,
+                    currentTheme.colors.text
+                  )}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={executerSuppression}
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 shadow-lg shadow-red-500/30 transition-colors"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Résumé du patrimoine */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className={cn(
+          "overflow-hidden relative border-none",
+          patrimoineNet >= 0 
+            ? "bg-gradient-to-br from-blue-600 to-indigo-600" 
+            : "bg-gradient-to-br from-red-500 to-pink-600",
+          "text-white"
+        )}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <Wallet className="w-5 h-5 opacity-80" />
+              <span className="text-sm font-medium opacity-80">Patrimoine Net</span>
+            </div>
+            <div className="text-3xl font-bold">{formaterMontant(patrimoineNet)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(
+          "overflow-hidden relative border-none bg-gradient-to-br from-emerald-500 to-teal-500 text-white"
+        )}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingUp className="w-5 h-5 opacity-80" />
+              <span className="text-sm font-medium opacity-80">Total Actifs</span>
+            </div>
+            <div className="text-3xl font-bold">{formaterMontant(totalActifs)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(
+          "overflow-hidden relative border-none bg-gradient-to-br from-red-500 to-orange-500 text-white"
+        )}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <AlertTriangle className="w-5 h-5 opacity-80" />
+              <span className="text-sm font-medium opacity-80">Total Dettes</span>
+            </div>
+            <div className="text-3xl font-bold">{formaterMontant(totalDettes)}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      {assets.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {assets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} />
-          ))}
+      {/* Formulaire d'ajout */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h2 className={cn("text-2xl font-bold mb-6 flex items-center gap-3", currentTheme.colors.text)}>
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl">
+            <Wallet className="w-6 h-6 text-white" />
+          </div>
+          Ajouter un actif
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <input
+            type="text"
+            placeholder="Nom de l'actif (ex: Livret A, Maison)"
+            value={nouvelActif.nom}
+            onChange={(e) => setNouvelActif({...nouvelActif, nom: e.target.value})}
+            className={inputClass}
+          />
+          <input
+            type="number"
+            placeholder="Valeur (€)"
+            value={nouvelActif.valeur}
+            onChange={(e) => setNouvelActif({...nouvelActif, valeur: e.target.value})}
+            className={inputClass}
+          />
+          <select
+            value={nouvelActif.type}
+            onChange={(e) => setNouvelActif({...nouvelActif, type: e.target.value})}
+            className={inputClass}
+          >
+            {ACTIF_TYPES.map(type => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
         </div>
-      ) : (
-        <Empty>
-          <PiggyBank className="h-12 w-12 text-muted-foreground" />
-           <div className="text-center">
-                <h3 className="text-lg font-semibold">No Assets Tracked</h3>
-                <p className="text-muted-foreground text-sm mt-1">Add your assets to calculate your complete net worth.</p>
+        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+        <button
+          onClick={ajouterActif}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:opacity-90 shadow-lg transition-all"
+        >
+          <PlusCircle className="w-5 h-5" /> Ajouter l&apos;actif
+        </button>
+      </div>
+
+      {/* Graphique d'évolution */}
+      {netWorthHistory.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-500" />
+              Évolution du Patrimoine Net
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={netWorthHistory}>
+                <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: currentTheme.colors.chartText, fontSize: 12 }} 
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: currentTheme.colors.chartText, fontSize: 12 }} 
+                  tickFormatter={(value) => formaterMontant(value as number)} 
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formaterMontant(value), "Patrimoine Net"]} 
+                  contentStyle={{
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                    backgroundColor: currentTheme.isDark ? '#1e293b' : '#fff',
+                    color: currentTheme.isDark ? '#f8fafc' : '#0f172a'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="Patrimoine Net" 
+                  stroke="#4f46e5" 
+                  strokeWidth={3} 
+                  dot={{ r: 5, fill: '#4f46e5' }} 
+                  activeDot={{ r: 8 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Liste des actifs */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+        currentTheme.colors.card,
+        currentTheme.colors.border
+      )}>
+        <h3 className={cn("text-xl font-bold mb-4", currentTheme.colors.text)}>
+          Mes actifs ({actifs.length})
+        </h3>
+        <div className="space-y-3">
+          {actifs.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <PiggyBank className={cn("w-12 h-12 mb-3 opacity-30", currentTheme.colors.subtext)} />
+              <p className={cn("text-center", currentTheme.colors.subtext)}>
+                Aucun actif ajouté pour le moment.
+              </p>
+              <p className={cn("text-center text-sm", currentTheme.colors.subtext)}>
+                Ajoutez vos actifs pour calculer votre patrimoine net.
+              </p>
             </div>
-        </Empty>
+          )}
+          {actifs.map(actif => {
+            const typeInfo = ACTIF_TYPES.find(t => t.value === actif.type) || ACTIF_TYPES[3];
+            const Icon = typeInfo.icon;
+            
+            return (
+              <div
+                key={actif.id}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-xl border transition-all hover:shadow-lg",
+                  currentTheme.colors.border,
+                  currentTheme.isDark ? "bg-slate-800/40" : "bg-blue-50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 bg-gradient-to-br ${typeInfo.gradient} rounded-lg`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <div className={cn("font-bold", currentTheme.colors.text)}>{actif.nom}</div>
+                    <div className={cn("text-xs", currentTheme.colors.subtext)}>{typeInfo.label}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="font-semibold text-blue-600">
+                    {formaterMontant(parseFloat(actif.valeur))}
+                  </div>
+                  <button
+                    onClick={() => confirmerSuppression(actif.id)}
+                    className="p-2 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section des dettes (crédits) */}
+      {totalDettes > 0 && (
+        <div className={cn(
+          "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
+          currentTheme.isDark ? "bg-red-900/20 border-red-800/30" : "bg-red-50 border-red-200"
+        )}>
+          <h3 className={cn("text-xl font-bold mb-4 text-red-600")}>
+            Mes dettes (crédits)
+          </h3>
+          <div className="space-y-3">
+            {depenses
+              .filter(d => d.categorie === 'credit' && d.montantTotal)
+              .map(dette => (
+                <div
+                  key={dette.id}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-xl border",
+                    currentTheme.isDark ? "bg-red-900/30 border-red-800/30" : "bg-white border-red-200"
+                  )}
+                >
+                  <div>
+                    <div className={cn("font-bold", currentTheme.colors.text)}>{dette.nom}</div>
+                    <div className={cn("text-xs", currentTheme.colors.subtext)}>
+                      {dette.mensualitesRestantes} mensualités restantes
+                    </div>
+                  </div>
+                  <div className="font-semibold text-red-600">
+                    -{formaterMontant(parseFloat(dette.montantTotal || '0'))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1043,37 +3085,238 @@ export default async function SettingsPage() {
 // FILE: app/(main)/transactions/page.tsx
 // ============================================================================
 
-// app/(main)/transactions/page.tsx
+'use client';
 
-import { getTransactions } from "@/lib/actions/transaction.actions";
-import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog";
-import { TransactionsTable } from "@/components/transactions/transactions-table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from 'react';
+import { PlusCircle, Trash2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { REVENUS_CATEGORIES } from '@/constants';
+import type { RevenuFrequence } from '@/types';
+import { useTheme } from '@/context/ThemeContext';
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { cn } from '@/lib/utils';
 
-export default async function TransactionsPage() {
-  const transactions = await getTransactions();
+export default function TransactionsPage() {
+  const { revenus, setRevenus } = useFinanceData();
+  const [nouveauRevenu, setNouveauRevenu] = useState({
+    nom: '', 
+    montant: '', 
+    frequence: 'mensuel' as RevenuFrequence, 
+    categorie: 'salaire', 
+    dateDebut: ''
+  });
+  const [error, setError] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const { currentTheme } = useTheme();
+
+  const ajouterRevenu = () => {
+    const montantNum = parseFloat(nouveauRevenu.montant);
+    if (!nouveauRevenu.nom.trim()) {
+      setError('Le nom du revenu est requis.');
+      return;
+    }
+    if (isNaN(montantNum) || montantNum <= 0) {
+      setError('Veuillez entrer un montant valide et positif.');
+      return;
+    }
+    setError('');
+    setRevenus([...revenus, { ...nouveauRevenu, id: Date.now() }]);
+    setNouveauRevenu({ nom: '', montant: '', frequence: 'mensuel', categorie: 'salaire', dateDebut: '' });
+  };
+
+  const confirmerSuppression = (id: number) => {
+    setDeleteConfirmId(id);
+  };
+
+  const annulerSuppression = () => {
+    setDeleteConfirmId(null);
+  };
+
+  const executerSuppression = () => {
+    if (deleteConfirmId !== null) {
+      setRevenus(revenus.filter(r => r.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const inputClass = cn(
+    "px-4 py-3 rounded-xl border-2 outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200",
+    currentTheme.colors.input,
+    currentTheme.colors.border,
+    currentTheme.colors.text
+  );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight">
-          Transactions
-        </h1>
-        <AddTransactionDialog />
+    <div className="space-y-6 animate-fadeIn relative">
+      
+      {/* Modal de confirmation */}
+      {deleteConfirmId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className={cn(
+            "rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 border transform transition-all scale-100", 
+            currentTheme.colors.card, 
+            currentTheme.colors.border
+          )}>
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className={cn("text-xl font-bold", currentTheme.colors.text)}>
+                Confirmer la suppression
+              </h3>
+              <p className={currentTheme.colors.subtext}>
+                Êtes-vous sûr de vouloir supprimer ce revenu ?
+              </p>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={annulerSuppression}
+                  className={cn(
+                    "flex-1 px-4 py-2 rounded-xl border font-semibold transition-colors hover:opacity-80", 
+                    currentTheme.colors.border, 
+                    currentTheme.colors.text
+                  )}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={executerSuppression}
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 shadow-lg shadow-red-500/30 transition-colors"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Formulaire d'ajout */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl", 
+        currentTheme.colors.card, 
+        currentTheme.colors.border
+      )}>
+        <h2 className={cn("text-2xl font-bold mb-6 flex items-center gap-3", currentTheme.colors.text)}>
+          <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl">
+            <TrendingUp className="w-6 h-6 text-white" />
+          </div>
+          Ajouter un revenu
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          <input 
+            type="text" 
+            placeholder="Nom du revenu" 
+            value={nouveauRevenu.nom} 
+            onChange={(e) => setNouveauRevenu({...nouveauRevenu, nom: e.target.value})} 
+            className={inputClass} 
+          />
+          <input 
+            type="number" 
+            step="0.01" 
+            placeholder="Montant (€)" 
+            value={nouveauRevenu.montant} 
+            onChange={(e) => setNouveauRevenu({...nouveauRevenu, montant: e.target.value})} 
+            className={inputClass} 
+          />
+          <select 
+            value={nouveauRevenu.frequence} 
+            onChange={(e) => setNouveauRevenu({...nouveauRevenu, frequence: e.target.value as RevenuFrequence})} 
+            className={inputClass}
+          >
+            <option value="mensuel">Mensuel</option>
+            <option value="ponctuel">Ponctuel</option>
+            <option value="annuel">Annuel</option>
+          </select>
+          <select 
+            value={nouveauRevenu.categorie} 
+            onChange={(e) => setNouveauRevenu({...nouveauRevenu, categorie: e.target.value})} 
+            className={inputClass}
+          >
+            {Object.entries(REVENUS_CATEGORIES).map(([key, cat]) => (
+              <option key={key} value={key}>{cat.label}</option>
+            ))}
+          </select>
+          <div className="lg:col-span-1">
+            <label 
+              htmlFor="revenu-date-debut" 
+              className={cn("block text-xs font-medium mb-1", currentTheme.colors.subtext)}
+            >
+              Date de début (optionnel)
+            </label>
+            <input 
+              id="revenu-date-debut" 
+              type="date" 
+              value={nouveauRevenu.dateDebut} 
+              onChange={(e) => setNouveauRevenu({...nouveauRevenu, dateDebut: e.target.value})} 
+              className={cn("w-full", inputClass)} 
+            />
+          </div>
+        </div>
+        
+        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+
+        <button 
+          onClick={ajouterRevenu} 
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:opacity-90 shadow-lg transition-all"
+        >
+          <PlusCircle className="w-5 h-5" /> Ajouter le revenu
+        </button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Transaction History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {transactions.length > 0 ? (
-            <TransactionsTable transactions={transactions} />
-          ) : (
-            <p className="text-muted-foreground">No transactions found. Add one to get started!</p>
+      {/* Liste des revenus */}
+      <div className={cn(
+        "rounded-2xl p-6 shadow-xl border backdrop-blur-xl", 
+        currentTheme.colors.card, 
+        currentTheme.colors.border
+      )}>
+        <h3 className={cn("text-xl font-bold mb-4", currentTheme.colors.text)}>
+          Mes revenus ({revenus.length})
+        </h3>
+        <div className="space-y-3">
+          {revenus.length === 0 && (
+            <p className={cn("text-center py-4", currentTheme.colors.subtext)}>
+              Aucun revenu ajouté pour le moment.
+            </p>
           )}
-        </CardContent>
-      </Card>
+          {revenus.map(rev => {
+            const catInfo = REVENUS_CATEGORIES[rev.categorie];
+            const Icon = catInfo?.icon || TrendingUp;
+            const gradient = catInfo?.gradient || 'from-emerald-500 to-teal-500';
+            
+            return (
+              <div 
+                key={rev.id} 
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-xl border hover:shadow-lg transition-all", 
+                  currentTheme.colors.border, 
+                  currentTheme.isDark ? "bg-slate-800/40" : "bg-gradient-to-r from-emerald-50 to-teal-50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 bg-gradient-to-br ${gradient} rounded-lg`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <div className={cn("font-bold", currentTheme.colors.text)}>{rev.nom}</div>
+                    <div className={cn("text-sm", currentTheme.colors.subtext)}>
+                      {parseFloat(rev.montant).toFixed(2)}€ · {rev.frequence}
+                      {rev.dateDebut && rev.frequence !== 'ponctuel' && (
+                        <span className="italic"> · à p. du {new Date(rev.dateDebut).toLocaleDateString('fr-FR')}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => confirmerSuppression(rev.id)} 
+                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1203,7 +3446,6 @@ export async function POST(request: Request) {
 // FILE: app/globals.css
 // ============================================================================
 
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -1212,8 +3454,11 @@ export async function POST(request: Request) {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  
+  /* 1. Set Roobert as the default sans font, fallback to Geist */
+  --font-sans: var(--font-roobert), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
+  
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -1243,6 +3488,7 @@ export async function POST(request: Request) {
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -1250,72 +3496,104 @@ export async function POST(request: Request) {
 }
 
 :root {
-  --radius: 0.625rem;
+  /* 2. Refined Radii for a modern feel */
+  --radius: 0.75rem;
+
+  /* LIGHT MODE - Crisp, Clean Zinc/Indigo Palette */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.13 0.028 261.692); /* Zinc 950 */
+  
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.13 0.028 261.692);
+  
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.13 0.028 261.692);
+  
+  /* Primary: Vibrant Indigo */
+  --primary: oklch(0.491 0.27 277.037);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  
+  --secondary: oklch(0.967 0.003 264.542); /* Zinc 100 */
+  --secondary-foreground: oklch(0.21 0.034 264.665); /* Zinc 800 */
+  
+  --muted: oklch(0.967 0.003 264.542);
+  --muted-foreground: oklch(0.552 0.016 285.938); /* Zinc 500 */
+  
+  --accent: oklch(0.967 0.003 264.542);
+  --accent-foreground: oklch(0.21 0.034 264.665);
+  
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.92 0.004 286.32); /* Zinc 200 */
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.491 0.27 277.037); /* Matches Primary */
+
+  /* Charts */
+  --chart-1: oklch(0.491 0.27 277.037); /* Indigo */
+  --chart-2: oklch(0.696 0.17 162.48);  /* Teal */
+  --chart-3: oklch(0.769 0.188 70.08);  /* Orange */
+  --chart-4: oklch(0.627 0.265 303.9);  /* Pink */
+  --chart-5: oklch(0.645 0.246 16.439); /* Red */
+
+  /* Sidebar Light */
+  --sidebar: oklch(0.984 0.003 247.858); /* Zinc 50 */
+  --sidebar-foreground: oklch(0.32 0.03 260);
+  --sidebar-primary: oklch(0.491 0.27 277.037);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(0.92 0.004 286.32);
+  --sidebar-accent-foreground: oklch(0.21 0.034 264.665);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.491 0.27 277.037);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* DARK MODE - Deep Blue-Grey/Zinc Palette */
+  --background: oklch(0.12 0.01 260); /* Deep rich grey */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  
+  --card: oklch(0.15 0.01 260); /* Slightly lighter than bg */
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  
+  --popover: oklch(0.15 0.01 260);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  
+  /* Primary: Lighter Indigo for Dark Mode contrast */
+  --primary: oklch(0.65 0.25 277);
+  --primary-foreground: oklch(0.12 0.01 260);
+  
+  --secondary: oklch(0.22 0.015 260);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  
+  --muted: oklch(0.22 0.015 260);
+  --muted-foreground: oklch(0.65 0.015 260);
+  
+  --accent: oklch(0.22 0.015 260);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
+  
+  --destructive: oklch(0.35 0.15 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.25 0.01 260);
+  --input: oklch(0.25 0.01 260);
+  --ring: oklch(0.55 0.25 277);
+
+  /* Charts */
+  --chart-1: oklch(0.65 0.25 277);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+
+  /* Sidebar Dark */
+  --sidebar: oklch(0.11 0.01 260);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.65 0.25 277);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.22 0.015 260);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-border: oklch(0.25 0.01 260);
+  --sidebar-ring: oklch(0.55 0.25 277);
 }
 
 @layer base {
@@ -1323,41 +3601,47 @@ export async function POST(request: Request) {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
-@keyframes appear {
+/* 3. Improved Animations */
+@keyframes appear-up {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(15px);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+    filter: blur(0);
   }
 }
 
 .animate-appear {
-  animation: appear 0.5s ease-out forwards;
+  animation: appear-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-@keyframes gradient-animation {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+/* Gradient Background Animation */
+@keyframes gradient-move {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .animated-gradient {
-  background: linear-gradient(-45deg, #4f46e5, #be185d, #23a6d5, #23d5ab);
-  background-size: 400% 400%;
-  animation: gradient-animation 15s ease infinite;
+  background: linear-gradient(-45deg, #6366f1, #d946ef, #0ea5e9, #10b981);
+  background-size: 300% 300%;
+  animation: gradient-move 10s ease infinite;
+}
+
+/* 4. Glassmorphism Utility */
+.glass {
+  @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg;
+}
+.dark .glass {
+  @apply bg-black/10 border-white/10;
 }
 
 // ============================================================================
@@ -1366,12 +3650,13 @@ export async function POST(request: Request) {
 
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Instrument_Sans, Lora } from "next/font/google";
+import localFont from "next/font/local";
+import { Geist, Geist_Mono, Instrument_Sans, Lora } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { Toaster } from "@/components/ui/toaster"; // MODIFICATION: Import Toaster
+import { Toaster } from "@/components/ui/toaster";
 
+// --- Google Fonts ---
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -1393,6 +3678,40 @@ const lora = Lora({
   weight: "600",
 });
 
+// --- Roobert Variable Fonts ---
+// Paths are now relative to this file (layout.tsx)
+const roobert = localFont({
+  src: [
+    {
+      path: './fonts/roobert/RoobertUprightsVF.woff2',
+      style: 'normal',
+    },
+    {
+      path: './fonts/roobert/RoobertItalicsVF.woff2',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-roobert',
+  weight: '100 900', // Variable fonts handle the full range
+  display: 'swap',
+});
+
+const roobertMono = localFont({
+  src: [
+    {
+      path: './fonts/roobert/RoobertMonoUprightsVF.woff2',
+      style: 'normal',
+    },
+    {
+      path: './fonts/roobert/RoobertMonoItalicsVF.woff2',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-roobert-mono',
+  weight: '100 900',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: "Finances Expert Pro",
   description: "The Smart Way to Manage Your Personal Finances",
@@ -1406,7 +3725,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${instrumentSans.variable} ${lora.variable} antialiased`}
+        className={`
+          ${roobert.variable} 
+          ${roobertMono.variable} 
+          ${geistSans.variable} 
+          ${geistMono.variable} 
+          ${instrumentSans.variable} 
+          ${lora.variable} 
+          antialiased
+        `}
       >
         <Providers
           attribute="class"
@@ -1415,7 +3742,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Toaster /> {/* MODIFICATION: Add Toaster here */}
+          <Toaster />
         </Providers>
       </body>
     </html>
@@ -1600,9 +3927,7 @@ export function AddBudgetDialog() {
 // FILE: components/dashboard/ai-insights-card.tsx
 // ============================================================================
 
-// ============================================================================
-// FILE: components/dashboard/ai-insights-card.tsx
-// ============================================================================
+// components/dashboard/ai-insights-card.tsx
 
 "use client";
 
@@ -1612,14 +3937,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { generateFinancialInsights } from "@/lib/actions/ai.actions";
 
+// Define the expected type
+type InsightsData = {
+  score: number;
+  summary: string;
+  recommendations?: string[]; // Make optional
+};
+
 export function AiInsightsCard() {
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<{score: number; summary: string; recommendations: string[]} | null>(null);
+  const [data, setData] = useState<InsightsData | null>(null);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
       const result = await generateFinancialInsights();
+      if (result.error) {
+        // Handle error gracefully (could use toast here)
+        console.error(result.error);
+        return;
+      }
       setData(result);
     } catch (error) {
       console.error(error);
@@ -1647,15 +3984,20 @@ export function AiInsightsCard() {
           <div className="space-y-4">
              <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border">
                 <span className="text-sm font-medium">Financial Health Score</span>
-                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score}/100</span>
+                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score ?? 0}/100</span>
              </div>
              <p className="text-sm">{data.summary}</p>
              <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">Recommendations</p>
                 <ul className="text-sm space-y-1 list-disc pl-4">
-                    {data.recommendations.map((rec, i) => (
-                        <li key={i}>{rec}</li>
-                    ))}
+                    {/* SAFE GUARD: Check if recommendations exists before mapping */}
+                    {data.recommendations && data.recommendations.length > 0 ? (
+                        data.recommendations.map((rec, i) => (
+                            <li key={i}>{rec}</li>
+                        ))
+                    ) : (
+                        <li>No specific recommendations available.</li>
+                    )}
                 </ul>
              </div>
           </div>
@@ -3203,7 +5545,7 @@ export function Footer() {
 // FILE: components/layout/header-main.tsx
 // ============================================================================
 
-// components/layout/header-main.tsx
+// components/layout/
 
 "use client";
 
@@ -3542,11 +5884,12 @@ import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { type ThemeProviderProps } from "next-themes";
 import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "@/context/useTheme";
 
 export function Providers({ children, ...props }: ThemeProviderProps) {
   return (
     <SessionProvider>
-      <NextThemesProvider {...props}>{children}</NextThemesProvider>
+      <ThemeProvider {...props}>{children}</ThemeProvider>
     </SessionProvider>
   );
 }
@@ -10832,6 +13175,845 @@ function useToast() {
 export { useToast, toast }
 
 // ============================================================================
+// FILE: constants.ts
+// ============================================================================
+
+
+import React from 'react';
+import { 
+  CreditCard, Home, Zap, Shield, ShoppingCart, TrendingDown, Wallet, 
+  Sparkles, TrendingUp, DollarSign, Target, Trophy, Star, Award, Crown, Coins, Gift, Palette,
+  FileDown, PieChart, Zap as ZapIcon
+} from 'lucide-react';
+import type { Category, Trophee, SeasonPassLevel, Quest } from './types';
+
+export const CATEGORIES: Record<string, Category> = {
+  abonnement: { label: 'Abonnement', icon: CreditCard, color: '#6366f1', gradient: 'from-indigo-500 to-blue-500' },
+  loyer: { label: 'Loyer', icon: Home, color: '#ef4444', gradient: 'from-red-500 to-pink-500' },
+  credit: { label: 'Crédit', icon: TrendingDown, color: '#f59e0b', gradient: 'from-amber-500 to-orange-500' },
+  energie: { label: 'Énergie', icon: Zap, color: '#10b981', gradient: 'from-emerald-500 to-green-500' },
+  assurance: { label: 'Assurance', icon: Shield, color: '#8b5cf6', gradient: 'from-purple-500 to-violet-500' },
+  paiementFractionne: { label: 'Paiement fractionné', icon: ShoppingCart, color: '#ec4444', gradient: 'from-pink-500 to-rose-500' },
+};
+
+export const REVENUS_CATEGORIES: Record<string, Category> = {
+  salaire: { label: 'Salaire', icon: Wallet, color: '#10b981', gradient: 'from-emerald-500 to-teal-500' },
+  freelance: { label: 'Freelance', icon: Sparkles, color: '#6366f1', gradient: 'from-indigo-500 to-purple-500' },
+  allocations: { label: 'Allocations', icon: Shield, color: '#8b5cf6', gradient: 'from-violet-500 to-purple-500' },
+  dividendes: { label: 'Dividendes', icon: TrendingUp, color: '#f59e0b', gradient: 'from-amber-500 to-yellow-500' },
+  autres: { label: 'Autres', icon: DollarSign, color: '#6b7280', gradient: 'from-gray-500 to-slate-500' },
+};
+
+export const TYPES_ASSURANCE: Record<string, string> = {
+  auto: 'Automobile', habitation: 'Habitation', sante: 'Santé/Mutuelle',
+  vie: 'Vie', prevoyance: 'Prévoyance', responsabilite: 'Responsabilité civile', autres: 'Autres'
+};
+
+export const TROPHEES: Trophee[] = [
+  { id: 'economie', nom: '🎯 Économe', description: 'Première dépense ajoutée', condition: (data) => data.depenses.length > 0 },
+  { id: 'visionnaire', nom: '🔮 Visionnaire', description: 'Premier objectif créé', condition: (data) => data.objectifs.length > 0 },
+  { id: 'cashflow', nom: '💰 Cash Flow Positif', description: 'Revenus > Dépenses', condition: (data) => data.cashFlow > 0 },
+  { id: 'maitre', nom: '🏆 Maître du Budget', description: 'Score de santé > 80', condition: (data) => data.score >= 80 },
+  { id: 'investisseur', nom: '📈 Investisseur', description: '3 actifs dans le patrimoine', condition: (data) => data.actifs.length >= 3 },
+  { id: 'stratege', nom: '🎲 Stratège des Dettes', description: 'Optimisation activée', condition: (data) => data.optimisationDettes },
+  { id: 'planificateurExpert', nom: '📈 Planificateur Expert', description: 'Créer au moins 3 objectifs', condition: (data) => data.objectifs.length >= 3 },
+  { id: 'budgetPro', nom: '📊 Pro du Budget', description: 'Définir son premier budget', condition: (data) => data.budgets.length > 0 },
+  { id: 'iaCurieux', nom: '🤖 Curieux de l\'IA', description: 'Lancer sa première analyse IA', condition: (data) => data.analyseIAEffectuee },
+];
+
+export const CADEAUX_OBJECTIFS = [
+  {
+    pourcentage: 50,
+    nom: 'Mi-Parcours',
+    description: 'La moitié du chemin est faite !',
+    icon: Star,
+    gradient: 'from-yellow-400 to-amber-500',
+  },
+  {
+    pourcentage: 100,
+    nom: 'Mission Accomplie !',
+    description: 'Félicitations ! Objectif atteint.',
+    icon: Award,
+    gradient: 'from-emerald-400 to-green-500',
+  }
+];
+
+// --- GAME PASS DATA ---
+
+export const SEASON_LEVELS: SeasonPassLevel[] = [
+  {
+    level: 1,
+    xpRequired: 100,
+    freeReward: { id: 'free_1', type: 'coin', name: '50 Pièces', value: 50, icon: Coins },
+    premiumReward: { id: 'prem_1', type: 'coin', name: '200 Pièces', value: 200, icon: Coins }
+  },
+  {
+    level: 2,
+    xpRequired: 250,
+    freeReward: { id: 'free_2', type: 'feature', name: 'Export CSV', value: 'export_csv', icon: FileDown, description: "Débloque l'export de données" },
+    premiumReward: { id: 'prem_2', type: 'coin', name: '300 Pièces', value: 300, icon: Coins }
+  },
+  {
+    level: 3,
+    xpRequired: 450,
+    freeReward: { id: 'free_3', type: 'coin', name: '100 Pièces', value: 100, icon: Coins },
+    premiumReward: { id: 'prem_3', type: 'badge', name: 'Badge Analyste', value: 'badge_analyst', icon: Award }
+  },
+  {
+    level: 4,
+    xpRequired: 700,
+    freeReward: null,
+    premiumReward: { id: 'prem_4', type: 'coin', name: '500 Pièces', value: 500, icon: Coins }
+  },
+  {
+    level: 5,
+    xpRequired: 1000,
+    freeReward: { id: 'free_5', type: 'coin', name: '150 Pièces', value: 150, icon: Coins },
+    premiumReward: { id: 'prem_5', type: 'feature', name: 'Graphiques Avancés', value: 'radar_chart', icon: PieChart, description: "Analyse visuelle Radar" }
+  },
+  {
+    level: 6,
+    xpRequired: 1350,
+    freeReward: null,
+    premiumReward: { id: 'prem_6', type: 'coin', name: '750 Pièces', value: 750, icon: Coins }
+  },
+  {
+    level: 7,
+    xpRequired: 1750,
+    freeReward: { id: 'free_7', type: 'coin', name: '200 Pièces', value: 200, icon: Coins },
+    premiumReward: { id: 'prem_7', type: 'feature', name: 'Thème Cyberpunk', value: 'cyberpunk', icon: ZapIcon, description: "Design Néon Exclusif" }
+  },
+  {
+    level: 8,
+    xpRequired: 2200,
+    freeReward: null,
+    premiumReward: { id: 'prem_8', type: 'coin', name: '1000 Pièces', value: 1000, icon: Coins }
+  },
+  {
+    level: 9,
+    xpRequired: 2700,
+    freeReward: { id: 'free_9', type: 'coin', name: '250 Pièces', value: 250, icon: Coins },
+    premiumReward: { id: 'prem_9', type: 'badge', name: 'Badge Magnat', value: 'badge_tycoon', icon: Crown }
+  },
+  {
+    level: 10,
+    xpRequired: 3500,
+    freeReward: { id: 'free_10', type: 'coin', name: '500 Pièces', value: 500, icon: Coins },
+    premiumReward: { id: 'prem_10', type: 'feature', name: 'Thème Royal', value: 'royal', icon: Palette, description: "L'ultime prestige" }
+  }
+];
+
+export const DAILY_QUESTS: Quest[] = [
+  { id: 'q1', title: 'Gestionnaire Actif', description: 'Ajouter une dépense aujourd\'hui', xpReward: 50, coinReward: 10, progress: 0, target: 1, completed: false, type: 'add_expense' },
+  { id: 'q2', title: 'Épargnant', description: 'Consulter ses objectifs', xpReward: 30, coinReward: 5, progress: 0, target: 1, completed: false, type: 'check_app' },
+  { id: 'q3', title: 'Analyste', description: 'Vérifier son patrimoine', xpReward: 40, coinReward: 10, progress: 0, target: 1, completed: false, type: 'check_app' },
+];
+
+
+// ============================================================================
+// FILE: constants/index.ts
+// ============================================================================
+
+import { 
+  Briefcase, Gift, TrendingUp, PiggyBank, Home, Coins, Star, Flame, Trophy,
+  FileDown, BarChart3, Palette, Crown, Sparkles, Shield, Zap, Award
+} from 'lucide-react';
+import type { Quest } from '@/types';
+
+export type SeasonLevel = {
+  level: number;
+  xpRequired: number;
+  freeReward: { id: string; type: string; value: number | string; icon: React.ElementType; description: string };
+  premiumReward: { id: string; type: string; value: number | string; icon: React.ElementType; description: string };
+};
+
+export const CATEGORIES: Record<string, { label: string; color: string }> = {
+  logement: { label: 'Logement', color: '#6366f1' },
+  alimentation: { label: 'Alimentation', color: '#10b981' },
+  transport: { label: 'Transport', color: '#f59e0b' },
+  loisirs: { label: 'Loisirs', color: '#ec4899' },
+  sante: { label: 'Santé', color: '#ef4444' },
+  shopping: { label: 'Shopping', color: '#8b5cf6' },
+  abonnements: { label: 'Abonnements', color: '#06b6d4' },
+  credit: { label: 'Crédit', color: '#f97316' },
+  autres: { label: 'Autres', color: '#64748b' },
+};
+
+export const REVENUS_CATEGORIES: Record<string, { label: string; icon: React.ElementType; gradient: string }> = {
+  salaire: { label: 'Salaire', icon: Briefcase, gradient: 'from-emerald-500 to-teal-500' },
+  freelance: { label: 'Freelance', icon: TrendingUp, gradient: 'from-blue-500 to-cyan-500' },
+  investissement: { label: 'Investissement', icon: Coins, gradient: 'from-amber-500 to-orange-500' },
+  immobilier: { label: 'Immobilier', icon: Home, gradient: 'from-purple-500 to-pink-500' },
+  epargne: { label: 'Épargne', icon: PiggyBank, gradient: 'from-indigo-500 to-violet-500' },
+  cadeau: { label: 'Cadeau', icon: Gift, gradient: 'from-rose-500 to-red-500' },
+  autre: { label: 'Autre', icon: Coins, gradient: 'from-slate-500 to-gray-500' },
+};
+
+export const CADEAUX_OBJECTIFS = [
+  { 
+    nom: 'Débutant', 
+    description: 'Premier pas vers votre objectif !', 
+    pourcentage: 25,
+    gradient: 'from-blue-400 to-blue-600',
+    icon: Star
+  },
+  { 
+    nom: 'Progression', 
+    description: 'Vous êtes à mi-chemin !', 
+    pourcentage: 50,
+    gradient: 'from-purple-400 to-purple-600',
+    icon: TrendingUp
+  },
+  { 
+    nom: 'Presque !', 
+    description: 'Plus que quelques efforts !', 
+    pourcentage: 75,
+    gradient: 'from-orange-400 to-orange-600',
+    icon: Flame
+  },
+  { 
+    nom: 'Champion', 
+    description: 'Objectif atteint ! 🎉', 
+    pourcentage: 100,
+    gradient: 'from-emerald-400 to-emerald-600',
+    icon: Trophy
+  },
+];
+
+export const SEASON_LEVELS: SeasonLevel[] = [
+  { 
+    level: 1, 
+    xpRequired: 100,
+    freeReward: { id: 'free-1', type: 'coin', value: 50, icon: Coins, description: '50 pièces' },
+    premiumReward: { id: 'prem-1', type: 'coin', value: 150, icon: Coins, description: '150 pièces' }
+  },
+  { 
+    level: 2, 
+    xpRequired: 250,
+    freeReward: { id: 'free-2', type: 'feature', value: 'export_csv', icon: FileDown, description: 'Export CSV débloqué' },
+    premiumReward: { id: 'prem-2', type: 'coin', value: 200, icon: Coins, description: '200 pièces' }
+  },
+  { 
+    level: 3, 
+    xpRequired: 500,
+    freeReward: { id: 'free-3', type: 'coin', value: 100, icon: Coins, description: '100 pièces' },
+    premiumReward: { id: 'prem-3', type: 'badge', value: 'early_supporter', icon: Award, description: 'Badge Supporter' }
+  },
+  { 
+    level: 4, 
+    xpRequired: 800,
+    freeReward: { id: 'free-4', type: 'coin', value: 150, icon: Coins, description: '150 pièces' },
+    premiumReward: { id: 'prem-4', type: 'theme', value: 'cyberpunk', icon: Palette, description: 'Thème Cyberpunk' }
+  },
+  { 
+    level: 5, 
+    xpRequired: 1200,
+    freeReward: { id: 'free-5', type: 'feature', value: 'radar_chart', icon: BarChart3, description: 'Graphique Radar' },
+    premiumReward: { id: 'prem-5', type: 'coin', value: 300, icon: Coins, description: '300 pièces' }
+  },
+  { 
+    level: 6, 
+    xpRequired: 1700,
+    freeReward: { id: 'free-6', type: 'coin', value: 200, icon: Coins, description: '200 pièces' },
+    premiumReward: { id: 'prem-6', type: 'feature', value: 'ai_analysis', icon: Sparkles, description: 'Analyse IA avancée' }
+  },
+  { 
+    level: 7, 
+    xpRequired: 2300,
+    freeReward: { id: 'free-7', type: 'badge', value: 'veteran', icon: Shield, description: 'Badge Vétéran' },
+    premiumReward: { id: 'prem-7', type: 'theme', value: 'royal', icon: Crown, description: 'Thème Royal' }
+  },
+  { 
+    level: 8, 
+    xpRequired: 3000,
+    freeReward: { id: 'free-8', type: 'coin', value: 250, icon: Coins, description: '250 pièces' },
+    premiumReward: { id: 'prem-8', type: 'coin', value: 500, icon: Coins, description: '500 pièces' }
+  },
+  { 
+    level: 9, 
+    xpRequired: 4000,
+    freeReward: { id: 'free-9', type: 'feature', value: 'custom_categories', icon: Zap, description: 'Catégories personnalisées' },
+    premiumReward: { id: 'prem-9', type: 'badge', value: 'legend', icon: Trophy, description: 'Badge Légende' }
+  },
+  { 
+    level: 10, 
+    xpRequired: 5000,
+    freeReward: { id: 'free-10', type: 'badge', value: 'master', icon: Crown, description: 'Badge Maître' },
+    premiumReward: { id: 'prem-10', type: 'feature', value: 'all_themes', icon: Palette, description: 'Tous les thèmes' }
+  },
+];
+
+export const DEFAULT_QUESTS: Quest[] = [
+  {
+      id: 'quest-1',
+      title: 'Premier pas',
+      description: 'Ajoutez votre premier revenu',
+      xpReward: 50,
+      coinReward: 25,
+      progress: 0,
+      target: 1,
+      completed: false,
+      type: 'add_expense'
+  },
+  {
+      id: 'quest-2',
+      title: 'Gestionnaire',
+      description: 'Ajoutez 3 dépenses',
+      xpReward: 75,
+      coinReward: 35,
+      progress: 0,
+      target: 3,
+      completed: false,
+      type: 'add_expense'
+  },
+  {
+      id: 'quest-3',
+      title: 'Objectif clair',
+      description: 'Créez votre premier objectif d\'épargne',
+      xpReward: 100,
+      coinReward: 50,
+      progress: 0,
+      target: 1,
+      completed: false,
+      type: 'add_expense'
+  },
+  {
+      id: 'quest-4',
+      title: 'Investisseur',
+      description: 'Ajoutez un investissement',
+      xpReward: 100,
+      coinReward: 50,
+      progress: 0,
+      target: 1,
+      completed: false,
+      type: 'add_expense'
+  },
+];
+
+// ============================================================================
+// FILE: context/DataContext.tsx
+// ============================================================================
+
+'use client';
+
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+
+interface Lead {
+  id: string;
+  name: string;
+  company: string;
+  score: number;
+}
+
+interface Card {
+  id: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+interface Analytics {
+  daily: { date: string; views: number }[];
+}
+
+interface DataContextType {
+  analytics: Analytics;
+  leads: Lead[];
+  cards: Card[];
+}
+
+const DataContext = createContext<DataContextType | undefined>(undefined);
+
+export function DataProvider({ children }: { children: ReactNode }) {
+  const [analytics] = useState<Analytics>({
+    daily: [
+      { date: 'Lun', views: 45 },
+      { date: 'Mar', views: 52 },
+      { date: 'Mer', views: 38 },
+      { date: 'Jeu', views: 65 },
+      { date: 'Ven', views: 48 },
+      { date: 'Sam', views: 72 },
+      { date: 'Dim', views: 55 },
+    ]
+  });
+  
+  const [leads] = useState<Lead[]>([]);
+  const [cards] = useState<Card[]>([]);
+
+  return (
+    <DataContext.Provider value={{ analytics, leads, cards }}>
+      {children}
+    </DataContext.Provider>
+  );
+}
+
+export function useData() {
+  const context = useContext(DataContext);
+  if (!context) {
+    throw new Error('useData must be used within a DataProvider');
+  }
+  return context;
+}
+
+// ============================================================================
+// FILE: context/FinanceDataContext.tsx
+// ============================================================================
+
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState, Investment } from '@/types';
+import { calculerMontantMensuel } from '@/utils/financeCalculations';
+import { DEFAULT_QUESTS } from '@/constants/index';
+
+type StrategieDette = 'avalanche' | 'boule de neige';
+
+interface FinanceDataContextType {
+  cashFlow: number;
+  scoreSante: number;
+  totalRevenusMensuel: number;
+  totalDepensesMensuel: number;
+  patrimoineNet: number;
+  revenus: Revenu[];
+  setRevenus: React.Dispatch<React.SetStateAction<Revenu[]>>;
+  depenses: Depense[];
+  setDepenses: React.Dispatch<React.SetStateAction<Depense[]>>;
+  objectifs: Objectif[];
+  setObjectifs: React.Dispatch<React.SetStateAction<Objectif[]>>;
+  actifs: Actif[];
+  setActifs: React.Dispatch<React.SetStateAction<Actif[]>>;
+  tropheesDeverrouilles: Trophee[];
+  analyserAvecIA: () => void;
+  chargementIA: boolean;
+  budgets: Budget[];
+  setBudgets: React.Dispatch<React.SetStateAction<Budget[]>>;
+  gameState: GameState;
+  setGameState: React.Dispatch<React.SetStateAction<GameState>>;
+  investissements: Investment[];
+  setInvestissements: React.Dispatch<React.SetStateAction<Investment[]>>;
+  strategieDette: StrategieDette;
+  setStrategieDette: React.Dispatch<React.SetStateAction<StrategieDette>>;
+}
+
+const FinanceDataContext = createContext<FinanceDataContextType | undefined>(undefined);
+
+const initialGameState: GameState = {
+    level: 1,
+    xp: 0,
+    coins: 100,
+    isPremium: false,
+    unlockedFeatures: [],
+    claimedRewards: [],
+    quests: DEFAULT_QUESTS,
+    lastLoginDate: '',
+    streak: 0
+};
+
+export function FinanceDataProvider({ children }: { children: ReactNode }) {
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [revenus, setRevenus] = useState<Revenu[]>([]);
+  const [depenses, setDepenses] = useState<Depense[]>([]);
+  const [objectifs, setObjectifs] = useState<Objectif[]>([]);
+  const [actifs, setActifs] = useState<Actif[]>([]);
+  const [investissements, setInvestissements] = useState<Investment[]>([]);
+  const [chargementIA, setChargementIA] = useState(false);
+  const [strategieDette, setStrategieDette] = useState<StrategieDette>('avalanche');
+  const [gameState, setGameState] = useState<GameState>(initialGameState);
+
+  // Mise à jour des quêtes en fonction des données
+  useEffect(() => {
+    setGameState(prev => {
+      const updatedQuests = prev.quests.map(quest => {
+        let progress = 0;
+        let completed = quest.completed;
+
+        switch (quest.id) {
+          case 'quest-1':
+            progress = revenus.length;
+            completed = revenus.length >= quest.target;
+            break;
+          case 'quest-2':
+            progress = depenses.length;
+            completed = depenses.length >= quest.target;
+            break;
+          case 'quest-3':
+            progress = objectifs.length;
+            completed = objectifs.length >= quest.target;
+            break;
+          case 'quest-4':
+            progress = investissements.length;
+            completed = investissements.length >= quest.target;
+            break;
+        }
+
+        return { ...quest, progress, completed };
+      });
+
+      // Calculer XP gagné des quêtes complétées
+      const newlyCompletedQuests = updatedQuests.filter(
+        (q, i) => q.completed && !prev.quests[i].completed
+      );
+      
+      let newXP = prev.xp;
+      let newCoins = prev.coins;
+      
+      newlyCompletedQuests.forEach(quest => {
+        newXP += quest.xpReward;
+        newCoins += quest.coinReward;
+      });
+
+      return {
+        ...prev,
+        quests: updatedQuests,
+        xp: newXP,
+        coins: newCoins,
+      };
+    });
+  }, [revenus.length, depenses.length, objectifs.length, investissements.length]);
+
+  // Calculs dynamiques
+  const totalRevenusMensuel = revenus.reduce((acc: number, rev) => {
+    return acc + calculerMontantMensuel(rev);
+  }, 0);
+
+  const totalDepensesMensuel = depenses.reduce((acc: number, dep) => {
+    return acc + calculerMontantMensuel(dep);
+  }, 0);
+
+  const totalActifs = actifs.reduce((acc, actif) => {
+    return acc + (parseFloat(actif.valeur) || 0);
+  }, 0);
+
+  const totalInvestissements = investissements.reduce((acc, inv) => {
+    return acc + (inv.quantity * inv.currentPrice);
+  }, 0);
+
+  const totalDettes = depenses
+    .filter(d => d.categorie === 'credit' && d.montantTotal)
+    .reduce((acc, d) => acc + (parseFloat(d.montantTotal || '0')), 0);
+
+  const cashFlow = totalRevenusMensuel - totalDepensesMensuel;
+  const scoreSante = Math.min(100, Math.max(0, Math.round((cashFlow / (totalRevenusMensuel || 1)) * 100 + 50)));
+  const patrimoineNet = totalActifs + totalInvestissements - totalDettes;
+
+  const value: FinanceDataContextType = {
+    cashFlow,
+    scoreSante,
+    totalRevenusMensuel,
+    totalDepensesMensuel,
+    patrimoineNet,
+    revenus,
+    setRevenus,
+    depenses,
+    setDepenses,
+    objectifs,
+    setObjectifs,
+    actifs,
+    setActifs,
+    tropheesDeverrouilles: [],
+    analyserAvecIA: () => {
+      setChargementIA(true);
+      setTimeout(() => setChargementIA(false), 2000);
+    },
+    chargementIA,
+    budgets,
+    setBudgets,
+    gameState,
+    setGameState,
+    investissements,
+    setInvestissements,
+    strategieDette,
+    setStrategieDette,
+  };
+
+  return (
+    <FinanceDataContext.Provider value={value}>
+      {children}
+    </FinanceDataContext.Provider>
+  );
+}
+
+export function useFinanceData() {
+  const context = useContext(FinanceDataContext);
+  if (!context) {
+    throw new Error('useFinanceData must be used within a FinanceDataProvider');
+  }
+  return context;
+}
+
+// ============================================================================
+// FILE: context/ThemeContext.tsx
+// ============================================================================
+
+'use client';
+
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+
+interface Theme {
+  isDark: boolean;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    text: string;
+    subtext: string;
+    card: string;
+    border: string;
+    input: string;
+    chartText: string;
+  };
+  gradients: {
+    primaryButton: string;
+  };
+}
+
+const lightTheme: Theme = {
+  isDark: false,
+  colors: {
+    primary: 'indigo-600',
+    secondary: 'purple-600',
+    accent: 'pink-600',
+    text: 'text-slate-900',
+    subtext: 'text-slate-500',
+    card: 'bg-white',
+    border: 'border-slate-200',
+    input: 'bg-white',
+    chartText: '#64748b',
+  },
+  gradients: {
+    primaryButton: 'bg-gradient-to-r from-indigo-600 to-purple-600',
+  },
+};
+
+const darkTheme: Theme = {
+  isDark: true,
+  colors: {
+    primary: 'indigo-400',
+    secondary: 'purple-400',
+    accent: 'pink-400',
+    text: 'text-slate-100',
+    subtext: 'text-slate-400',
+    card: 'bg-slate-800',
+    border: 'border-slate-700',
+    input: 'bg-slate-700',
+    chartText: '#94a3b8',
+  },
+  gradients: {
+    primaryButton: 'bg-gradient-to-r from-indigo-500 to-purple-500',
+  },
+};
+
+interface ThemeContextType {
+  currentTheme: Theme;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [isDark, setIsDark] = useState(false);
+
+  const toggleTheme = () => setIsDark(!isDark);
+
+  return (
+    <ThemeContext.Provider value={{ currentTheme: isDark ? darkTheme : lightTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+}
+
+// ============================================================================
+// FILE: context/useTheme.tsx
+// ============================================================================
+
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { Theme, ThemeId } from '../types';
+
+// Helper pour les propriétés communes des thèmes clairs
+const lightThemeProps = {
+  isDark: false,
+  colors: {
+    text: 'text-slate-900',
+    subtext: 'text-slate-500',
+    card: 'bg-white/70',
+    border: 'border-white/50',
+    input: 'bg-white',
+    chartText: '#64748b'
+  }
+};
+
+const THEMES: Record<ThemeId, Theme> = {
+  default: {
+    id: 'default',
+    name: 'Futuriste',
+    ...lightThemeProps,
+    colors: { ...lightThemeProps.colors, primary: 'indigo-600', secondary: 'purple-600', accent: 'pink-500' },
+    gradients: {
+      header: 'bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500',
+      appBackground: 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50',
+      primaryButton: 'bg-gradient-to-r from-indigo-600 to-purple-600',
+      activeTab: 'bg-gradient-to-r from-indigo-600 to-purple-600',
+      loginSidebar: 'bg-slate-900',
+    },
+    isPremium: false
+  },
+  dark: {
+    id: 'dark',
+    name: 'Sombre',
+    isDark: true,
+    colors: {
+      primary: 'slate-200',
+      secondary: 'slate-400',
+      accent: 'indigo-400',
+      text: 'text-slate-100',
+      subtext: 'text-slate-400',
+      card: 'bg-slate-900/80',
+      border: 'border-slate-700',
+      input: 'bg-slate-950',
+      chartText: '#94a3b8'
+    },
+    gradients: {
+      header: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700',
+      appBackground: 'bg-slate-950',
+      primaryButton: 'bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500',
+      activeTab: 'bg-gradient-to-r from-slate-700 to-slate-600',
+      loginSidebar: 'bg-black',
+    },
+    isPremium: false
+  },
+  ocean: {
+    id: 'ocean',
+    name: 'Océan',
+    ...lightThemeProps,
+    colors: { ...lightThemeProps.colors, primary: 'blue-600', secondary: 'cyan-600', accent: 'teal-400' },
+    gradients: {
+      header: 'bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-500',
+      appBackground: 'bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50',
+      primaryButton: 'bg-gradient-to-r from-blue-600 to-cyan-600',
+      activeTab: 'bg-gradient-to-r from-blue-600 to-cyan-600',
+      loginSidebar: 'bg-slate-900',
+    },
+    isPremium: false
+  },
+  nature: {
+    id: 'nature',
+    name: 'Nature',
+    ...lightThemeProps,
+    colors: { ...lightThemeProps.colors, primary: 'emerald-600', secondary: 'green-600', accent: 'lime-500' },
+    gradients: {
+      header: 'bg-gradient-to-br from-emerald-600 via-green-600 to-lime-500',
+      appBackground: 'bg-gradient-to-br from-slate-50 via-emerald-50 to-green-50',
+      primaryButton: 'bg-gradient-to-r from-emerald-600 to-green-600',
+      activeTab: 'bg-gradient-to-r from-emerald-600 to-green-600',
+      loginSidebar: 'bg-slate-900',
+    },
+    isPremium: false
+  },
+  sunset: {
+    id: 'sunset',
+    name: 'Sunset',
+    ...lightThemeProps,
+    colors: { ...lightThemeProps.colors, primary: 'orange-600', secondary: 'red-600', accent: 'amber-500' },
+    gradients: {
+      header: 'bg-gradient-to-br from-orange-600 via-red-600 to-amber-500',
+      appBackground: 'bg-gradient-to-br from-slate-50 via-orange-50 to-amber-50',
+      primaryButton: 'bg-gradient-to-r from-orange-600 to-red-600',
+      activeTab: 'bg-gradient-to-r from-orange-600 to-red-600',
+      loginSidebar: 'bg-slate-900',
+    },
+    isPremium: false
+  },
+  cyberpunk: {
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    isDark: true,
+    colors: { 
+      primary: 'fuchsia-600', secondary: 'violet-600', accent: 'cyan-400',
+      text: 'text-fuchsia-50', subtext: 'text-fuchsia-200',
+      card: 'bg-slate-900/80', border: 'border-fuchsia-500/30',
+      input: 'bg-black', chartText: '#e879f9'
+    },
+    gradients: {
+      header: 'bg-gradient-to-br from-fuchsia-700 via-purple-800 to-indigo-900 border-b-4 border-cyan-400',
+      appBackground: 'bg-slate-900',
+      primaryButton: 'bg-gradient-to-r from-fuchsia-600 to-cyan-600 shadow-[0_0_15px_rgba(217,70,239,0.5)]',
+      activeTab: 'bg-gradient-to-r from-fuchsia-600 to-cyan-600',
+      loginSidebar: 'bg-black',
+    },
+    isPremium: true
+  },
+  royal: {
+    id: 'royal',
+    name: 'Luxe',
+    isDark: true,
+    colors: { 
+      primary: 'yellow-600', secondary: 'slate-600', accent: 'yellow-500',
+      text: 'text-yellow-50', subtext: 'text-yellow-200/70',
+      card: 'bg-slate-900/90', border: 'border-yellow-500/30',
+      input: 'bg-slate-950', chartText: '#eab308'
+    },
+    gradients: {
+      header: 'bg-gradient-to-br from-slate-900 via-slate-800 to-yellow-700 border-b border-yellow-500/50',
+      appBackground: 'bg-gradient-to-br from-gray-900 via-slate-900 to-black',
+      primaryButton: 'bg-gradient-to-r from-yellow-600 to-yellow-700 border border-yellow-400/30 text-white',
+      activeTab: 'bg-gradient-to-r from-slate-800 to-black text-yellow-500 border border-yellow-500/30',
+      loginSidebar: 'bg-black',
+    },
+    isPremium: true
+  }
+};
+
+interface ThemeContextType {
+  currentTheme: Theme;
+  setTheme: (id: ThemeId) => void;
+  availableThemes: Theme[];
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('finance_theme') as ThemeId;
+    if (savedTheme && THEMES[savedTheme]) {
+      setCurrentThemeId(savedTheme);
+    }
+  }, []);
+
+  const setTheme = (id: ThemeId) => {
+    setCurrentThemeId(id);
+    localStorage.setItem('finance_theme', id);
+  };
+
+  return (
+    <ThemeContext.Provider value={{ 
+      currentTheme: THEMES[currentThemeId], 
+      setTheme, 
+      availableThemes: Object.values(THEMES) 
+    }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+
+// ============================================================================
 // FILE: eslint.config.mjs
 // ============================================================================
 
@@ -11628,7 +14810,7 @@ export const siteConfig = {
 // FILE: lib/google-gemini-ai.ts
 // ============================================================================
 
-// lib/google-gemini-ai.ts (NEW FILE)
+// lib/google-gemini-ai.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 if (!process.env.GEMINI_API_KEY) {
@@ -11637,10 +14819,19 @@ if (!process.env.GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Use a cheaper/faster model for basic JSON tasks
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash-lite",
+    // Force JSON mode where supported, but we still clean the output manually below to be safe
     generationConfig: { responseMimeType: "application/json" }
 });
+
+// Helper to strip Markdown code blocks
+function cleanJsonOutput(text: string) {
+  // Remove ```json and ``` wrapping
+  const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  return cleaned;
+}
 
 export async function runFinancialAnalysis(financialData: any) {
   const prompt = `
@@ -11649,59 +14840,55 @@ export async function runFinancialAnalysis(financialData: any) {
     Financial Data:
     ${JSON.stringify(financialData, null, 2)}
 
-    Your task is to return a JSON object with the following structure:
+    Your task is to return a JSON object with the exact following structure:
     {
-      "score": <A financial health score from 0-100, where 100 is excellent. Base this on savings rate, debt-to-asset ratio, and spending habits>,
-      "summary": "<A 1-2 sentence summary of the user's overall financial health>",
-      "strengths": ["<A key financial strength>", "<Another strength>"],
-      "weaknesses": ["<A key financial weakness>", "<Another weakness>"],
-      "recommendations": [
-        "<A specific, actionable recommendation to improve their finances>",
-        "<Another actionable recommendation>",
-        "<A third actionable recommendation>"
-      ]
+      "score": <number 0-100>,
+      "summary": "<string>",
+      "strengths": ["<string>", "<string>"],
+      "weaknesses": ["<string>", "<string>"],
+      "recommendations": ["<string>", "<string>", "<string>"]
     }
 
-    Keep your analysis brief and to the point. The user wants actionable advice. Do not include any introductory text like "Here is the analysis". Just return the JSON object.
+    Do not include any introductory text. Just return the JSON string.
   `;
 
   const result = await model.generateContent(prompt);
   const response = result.response;
-  return response.text();
+  const text = response.text();
+  
+  return cleanJsonOutput(text);
 }
-
 
 export async function runDebtAnalysis(debts: any[]) {
     const prompt = `
-    You are a debt repayment specialist. Analyze the user's debts and recommend the best repayment strategy (Avalanche or Snowball).
-    Assume the user can pay an extra $200 per month towards their debts on top of all minimum payments.
+    You are a debt repayment specialist. Analyze the user's debts and recommend the best repayment strategy.
+    Assume the user can pay an extra $200 per month towards their debts.
 
     Debts Data:
     ${JSON.stringify(debts, null, 2)}
 
-    Simulate both the Avalanche (paying off highest APR first) and Snowball (paying off lowest balance first) methods.
-    
     Return a JSON object with the following structure:
     {
-        "bestMethod": "<'AVALANCHE' or 'SNOWBALL'>",
-        "reasoning": "<A brief explanation of why this method is recommended for this user's specific situation>",
+        "bestMethod": "AVALANCHE" | "SNOWBALL",
+        "reasoning": "<string>",
         "avalanche": {
-            "payoffMonths": <estimated months to be debt free>,
-            "totalInterest": <estimated total interest paid>
+            "payoffMonths": <number>,
+            "totalInterest": <number>
         },
         "snowball": {
-            "payoffMonths": <estimated months to be debt free>,
-            "totalInterest": <estimated total interest paid>
+            "payoffMonths": <number>,
+            "totalInterest": <number>
         }
     }
-
-    Base your calculations on the provided data and the $200 extra payment. Be realistic. For payoff months, round to the nearest whole number.
-    Just return the JSON object.
+    
+    Do not include any introductory text. Just return the JSON string.
     `;
 
     const result = await model.generateContent(prompt);
     const response = result.response;
-    return response.text();
+    const text = response.text();
+    
+    return cleanJsonOutput(text);
 }
 
 // ============================================================================
@@ -12116,6 +15303,324 @@ export const config = {
 
 
 // ============================================================================
+// FILE: types.ts
+// ============================================================================
+
+
+import type { LucideIcon } from 'lucide-react';
+
+export interface Category {
+  label: string;
+  icon: LucideIcon;
+  color: string;
+  gradient: string;
+}
+
+export type DepenseFrequence = 'quotidien' | 'hebdomadaire' | 'mensuel' | 'trimestriel' | 'semestriel' | 'annuel';
+export type RevenuFrequence = 'mensuel' | 'ponctuel' | 'annuel';
+
+export type TypeAssurance = 'auto' | 'habitation' | 'sante' | 'vie' | 'prevoyance' | 'responsabilite' | 'autres';
+
+export interface Depense {
+  id: number;
+  nom: string;
+  montant: string;
+  frequence: DepenseFrequence;
+  categorie: keyof typeof import('./constants').CATEGORIES;
+  dateDebut?: string;
+  montantTotal?: string;
+  mensualitesRestantes?: string;
+  tauxInteret?: string;
+  nombrePaiements?: string;
+  paiementsRestants?: string;
+  typeAssurance?: TypeAssurance | string;
+}
+
+export interface Revenu {
+  id: number;
+  nom: string;
+  montant: string;
+  frequence: RevenuFrequence;
+  categorie: keyof typeof import('./constants').REVENUS_CATEGORIES;
+  dateDebut?: string;
+}
+
+export interface Objectif {
+  id: number;
+  nom: string;
+  montantCible: string;
+  montantActuel: string;
+}
+
+export interface Actif {
+  type: string;
+  id: number;
+  nom: string;
+  valeur: string;
+}
+
+// --- INVESTISSEMENT TYPES ---
+export type InvestmentType = 'stock' | 'crypto' | 'etf' | 'bond' | 'other';
+
+export interface Investment {
+  id: string;
+  symbol: string; // e.g., AAPL, BTC
+  name: string;
+  type: InvestmentType;
+  quantity: number;
+  averageBuyPrice: number; // PRU
+  currentPrice: number; // Prix actuel (simulé ou entré manuellement)
+}
+
+export interface InfosFiscales {
+  rfr: string;
+  tmi: string;
+  impotsPayes: string;
+}
+
+export interface Trophee {
+  id: string;
+  nom: string;
+  description: string;
+  condition: (data: FinancialData) => boolean;
+}
+
+export interface Budget {
+  categorie: keyof typeof import('./constants').CATEGORIES;
+  limite: number;
+}
+
+export interface Notification {
+  id: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  message: string;
+  date: string;
+  read: boolean;
+}
+
+// --- GAMIFICATION TYPES ---
+
+export type RewardType = 'coin' | 'badge' | 'theme' | 'feature';
+
+export interface Reward {
+  id: string;
+  type: RewardType;
+  name: string;
+  value: number | string; // Amount of coins, theme ID, or feature key
+  icon?: LucideIcon;
+  description?: string;
+}
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  coinReward: number;
+  progress: number;
+  target: number;
+  completed: boolean;
+  type: 'add_expense' | 'add_income' | 'save_money' | 'check_app';
+}
+
+export interface SeasonPassLevel {
+  level: number;
+  xpRequired: number;
+  freeReward: Reward | null;
+  premiumReward: Reward | null;
+}
+
+export interface GameState {
+  level: number;
+  xp: number; // cumulative XP for current level
+  coins: number;
+  isPremium: boolean; // Elite Pass purchased
+  claimedRewards: string[]; // IDs of claimed rewards
+  unlockedFeatures: string[]; // List of unlocked feature keys (e.g., 'csv_export', 'radar_chart', 'theme_cyberpunk')
+  quests: Quest[];
+  lastLoginDate: string;
+  streak: number;
+}
+
+export interface FinancialData {
+  depenses: Depense[];
+  revenus: Revenu[];
+  objectifs: Objectif[];
+  actifs: Actif[];
+  investissements: Investment[]; // Nouveau champ
+  cashFlow: number;
+  score: number;
+  optimisationDettes: boolean;
+  patrimoineNet: number;
+  infosFiscales: InfosFiscales;
+  budgets: Budget[];
+  analyseIAEffectuee: boolean;
+  notifications: Notification[];
+  gameState: GameState;
+}
+
+export interface Recommandation {
+  priorite: number;
+  titre: string;
+  description: string;
+  economie: string;
+  delai: string;
+}
+
+export interface AnalyseIA {
+  score: number;
+  resume: string;
+  pointsForts: string[];
+  pointsFaibles: string[];
+  recommandationsPrioritaires: Recommandation[];
+  conseilsExpert: string[];
+  optimisationFiscale: string;
+}
+
+export type Onglet = 'dashboard' | 'revenus' | 'depenses' | 'ajouter' | 'fiscalite' | 'objectifs' | 'patrimoine' | 'dettes' | 'analyse' | 'seasonpass' | 'investissement' | 'simulateurs';
+
+export interface User {
+  username: string;
+  password: string; // Hashed
+  salt?: string;
+}
+
+// THEME TYPES
+export type ThemeId = 'default' | 'ocean' | 'nature' | 'sunset' | 'royal' | 'cyberpunk' | 'dark';
+
+export interface Theme {
+  id: ThemeId;
+  name: string;
+  isDark: boolean; // Nouveau flag pour le mode sombre
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    // Dynamic UI colors
+    text: string;       // Texte principal
+    subtext: string;    // Texte secondaire
+    card: string;       // Fond des cartes
+    border: string;     // Bordures
+    input: string;      // Fond des inputs
+    chartText: string;  // Couleur texte graphiques (hex)
+  };
+  gradients: {
+    header: string;
+    appBackground: string;
+    primaryButton: string;
+    activeTab: string;
+    loginSidebar: string;
+  };
+  isPremium?: boolean; // Requires unlock
+}
+
+
+// ============================================================================
+// FILE: types/index.ts
+// ============================================================================
+
+import { LucideIcon } from 'lucide-react';
+
+export type RevenuFrequence = 'mensuel' | 'ponctuel' | 'annuel';
+export type DepenseFrequence = 'hebdomadaire' | 'mensuel' | 'trimestriel' | 'semestriel' | 'annuel';
+export type InvestmentType = 'stock' | 'etf' | 'crypto';
+
+export interface Depense {
+  id: number;
+  nom: string;
+  montant: string;
+  frequence: DepenseFrequence;
+  categorie: string;
+  dateDebut: string;
+  montantTotal?: string;
+  mensualitesRestantes?: string;
+  tauxInteret?: string;
+  nombrePaiements?: string;
+  paiementsRestants?: string;
+  typeAssurance?: string;
+}
+
+export interface Revenu {
+  id: number;
+  nom: string;
+  montant: string;
+  frequence: RevenuFrequence;
+  categorie: string;
+  dateDebut: string;
+}
+
+export interface Objectif {
+  id: number;
+  nom: string;
+  montantCible: string;
+  montantActuel: string;
+}
+
+export interface Actif {
+  id: number;
+  nom: string;
+  valeur: string;
+  type?: string;
+}
+
+export interface Budget {
+  categorie: string;
+  limite: number;
+}
+
+export interface Trophee {
+  id: string;
+  nom: string;
+  description: string;
+}
+
+export interface Reward {
+  id: string;
+  type: 'coin' | 'feature' | 'theme' | 'badge';
+  value: string | number;
+  icon: LucideIcon;
+  description?: string;
+}
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  coinReward: number;
+  progress: number;
+  target: number;
+  completed: boolean;
+}
+
+export interface SeasonLevel {
+  level: number;
+  xpRequired: number;
+  freeReward?: Reward;
+  premiumReward?: Reward;
+}
+
+export interface GameState {
+  level: number;
+  xp: number;
+  coins: number;
+  isPremium: boolean;
+  unlockedFeatures: string[];
+  claimedRewards: string[];
+  quests: Quest[];
+}
+
+export interface Investment {
+  id: string;
+  symbol: string;
+  name: string;
+  type: InvestmentType;
+  quantity: number;
+  averageBuyPrice: number;
+  currentPrice: number;
+}
+
+// ============================================================================
 // FILE: types/next-auth.d.ts
 // ============================================================================
 
@@ -12136,8 +15641,45 @@ declare module "next-auth" {
 }
 
 // ============================================================================
+// FILE: utils/financeCalculations.ts
+// ============================================================================
+
+import type { Depense, Revenu } from '@/types';
+
+export function formaterMontant(montant: number): string {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(montant);
+}
+
+export function calculerMontantMensuel(item: Depense | Revenu): number {
+  const montant = typeof item.montant === 'string' ? parseFloat(item.montant) : item.montant;
+  if (isNaN(montant)) return 0;
+  
+  switch (item.frequence) {
+    case 'quotidien':
+      return montant * 30;
+    case 'hebdomadaire':
+      return montant * 4.33;
+    case 'mensuel':
+      return montant;
+    case 'trimestriel':
+      return montant / 3;
+    case 'semestriel':
+      return montant / 6;
+    case 'annuel':
+      return montant / 12;
+    default:
+      return montant;
+  }
+}
+
+// ============================================================================
 // END OF CONTEXT
 // ============================================================================
-// Total files included: 130
-// Generated: Wed Dec 17 16:42:58 CET 2025
+// Total files included: 140
+// Generated: Mon Jan  5 23:21:08 CET 2026
 // ============================================================================

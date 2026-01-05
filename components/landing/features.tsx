@@ -1,37 +1,82 @@
-// components/landing/features.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, BarChart, Trophy, Bot } from "lucide-react";
+import { 
+  BarChart3, 
+  Wallet, 
+  Target, 
+  Bot, 
+  ShieldCheck, 
+  Zap 
+} from "lucide-react";
 
 const featureList = [
-    { icon: <DollarSign className="w-8 h-8 text-primary" />, title: "Transaction Management", description: "Log income and expenses with ease. Categorize, sort, and filter to understand your spending habits." },
-    { icon: <BarChart className="w-8 h-8 text-primary" />, title: "Financial Planning", description: "Create and track financial goals. Set budgets for spending categories and monitor your progress in real-time." },
-    { icon: <Trophy className="w-8 h-8 text-primary" />, title: "Gamification", description: "Earn XP and level up by managing your finances. Unlock new features and themes as you go." },
-    { icon: <Bot className="w-8 h-8 text-primary" />, title: "AI-Powered Insights", description: "Get a detailed analysis of your financial health with actionable recommendations from our integrated AI." },
+    { 
+        icon: Wallet, 
+        title: "Gestion de Transactions", 
+        description: "Enregistrez vos revenus et dépenses en un clin d'œil. Catégorisez intelligemment pour mieux comprendre vos habitudes." 
+    },
+    { 
+        icon: BarChart3, 
+        title: "Planification Financière", 
+        description: "Définissez des budgets par catégorie et suivez votre progression en temps réel pour ne jamais dépasser vos limites." 
+    },
+    { 
+        icon: Target, 
+        title: "Objectifs & Gamification", 
+        description: "Transformez l'épargne en jeu. Gagnez de l'XP en atteignant vos objectifs et débloquez des fonctionnalités exclusives." 
+    },
+    { 
+        icon: Bot, 
+        title: "Analyses IA Avancées", 
+        description: "Recevez des conseils personnalisés et des prévisions de trésorerie générés par notre intelligence artificielle." 
+    },
+    { 
+        icon: ShieldCheck, 
+        title: "Sécurité Maximale", 
+        description: "Vos données sont chiffrées et protégées. Nous utilisons les standards bancaires pour garantir votre confidentialité." 
+    },
+    { 
+        icon: Zap, 
+        title: "Synchronisation Rapide", 
+        description: "Une interface fluide et réactive qui fonctionne parfaitement sur tous vos appareils, où que vous soyez." 
+    },
 ]
 
 export function Features() {
   return (
-    <section id="features" className="w-full py-24 sm:py-32">
-        <div className="container">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need to Succeed</h2>
-                <p className="mt-4 text-lg text-muted-foreground">
-                    All the tools to take control of your financial future, in one place.
+    <section id="features" className="w-full py-24 sm:py-32 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+        
+        {/* FIXED: Added mx-auto and px-4/6 to center the container */}
+        <div className="container mx-auto relative z-10 px-4 md:px-6">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4 bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+                    Tout ce dont vous avez besoin pour réussir
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                    Une suite complète d'outils puissants pour prendre le contrôle total de votre avenir financier.
                 </p>
             </div>
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
-                {featureList.map(feature => (
-                     <Card key={feature.title} className="text-center">
-                        <CardHeader>
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-                               {feature.icon}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {featureList.map((feature, i) => (
+                     <div 
+                        key={feature.title} 
+                        className="group relative p-8 rounded-2xl border bg-card hover:bg-accent/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/5"
+                     >
+                        <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <feature.icon className="w-24 h-24 text-primary" />
+                        </div>
+                        
+                        <div className="relative z-10">
+                            <div className="inline-flex items-center justify-center p-3 rounded-xl bg-primary/10 text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
+                               <feature.icon className="w-6 h-6" />
                             </div>
-                            <CardTitle>{feature.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground">{feature.description}</p>
-                        </CardContent>
-                     </Card>
+                            <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                            <p className="text-muted-foreground leading-relaxed">
+                                {feature.description}
+                            </p>
+                        </div>
+                     </div>
                 ))}
             </div>
         </div>

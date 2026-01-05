@@ -4,8 +4,32 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState, Investment } from '@/types';
 import { calculerMontantMensuel } from '@/utils/financeCalculations';
 import { DEFAULT_QUESTS } from '@/constants/index';
+// Import the Server Action
+import { generateFinancialInsights } from '@/lib/actions/ai.actions';
 
 type StrategieDette = 'avalanche' | 'boule de neige';
+
+// Define the shape of the AI response here (or import from types if centralized)
+export interface DeepInsightsData {
+  financialScore: number;
+  financialPersona: string;
+  executiveSummary: string;
+  keyTrends: {
+    title: string;
+    direction: 'up' | 'down' | 'flat';
+    insight: string;
+  }[];
+  actionableSteps: {
+    action: string;
+    impact: string;
+    difficulty: 'High' | 'Medium' | 'Low';
+  }[];
+  forecast: {
+    nextMonthSavings: number;
+    debtFreeProjection: string;
+    wealthProjection6Months: number;
+  };
+}
 
 interface FinanceDataContextType {
   cashFlow: number;
@@ -22,8 +46,11 @@ interface FinanceDataContextType {
   actifs: Actif[];
   setActifs: React.Dispatch<React.SetStateAction<Actif[]>>;
   tropheesDeverrouilles: Trophee[];
-  analyserAvecIA: () => void;
+  // AI Logic
+  analyserAvecIA: () => Promise<void>;
   chargementIA: boolean;
+  aiInsights: DeepInsightsData | null; // Added to store the result
+  
   budgets: Budget[];
   setBudgets: React.Dispatch<React.SetStateAction<Budget[]>>;
   gameState: GameState;
@@ -55,7 +82,11 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const [objectifs, setObjectifs] = useState<Objectif[]>([]);
   const [actifs, setActifs] = useState<Actif[]>([]);
   const [investissements, setInvestissements] = useState<Investment[]>([]);
+  
+  // AI State
   const [chargementIA, setChargementIA] = useState(false);
+  const [aiInsights, setAiInsights] = useState<DeepInsightsData | null>(null);
+
   const [strategieDette, setStrategieDette] = useState<StrategieDette>('avalanche');
   const [gameState, setGameState] = useState<GameState>(initialGameState);
 
@@ -135,6 +166,26 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const scoreSante = Math.min(100, Math.max(0, Math.round((cashFlow / (totalRevenusMensuel || 1)) * 100 + 50)));
   const patrimoineNet = totalActifs + totalInvestissements - totalDettes;
 
+  // --- Real AI Integration ---
+  const analyserAvecIA = async () => {
+    setChargementIA(true);
+    try {
+      // Calls the Server Action defined in lib/actions/ai.actions.ts
+      const result = await generateFinancialInsights();
+      
+      if (result.error) {
+        console.error("AI Analysis Failed:", result.error);
+        // You could also add a toast notification here if you import useToast
+      } else {
+        setAiInsights(result as DeepInsightsData);
+      }
+    } catch (error) {
+      console.error("Unexpected error during AI analysis:", error);
+    } finally {
+      setChargementIA(false);
+    }
+  };
+
   const value: FinanceDataContextType = {
     cashFlow,
     scoreSante,
@@ -150,11 +201,9 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
     actifs,
     setActifs,
     tropheesDeverrouilles: [],
-    analyserAvecIA: () => {
-      setChargementIA(true);
-      setTimeout(() => setChargementIA(false), 2000);
-    },
+    analyserAvecIA,
     chargementIA,
+    aiInsights, // Expose the data
     budgets,
     setBudgets,
     gameState,
