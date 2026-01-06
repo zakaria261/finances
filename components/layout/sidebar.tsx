@@ -44,6 +44,7 @@ import {
   Bell,
   Sparkles,
   ChevronsUpDown,
+  Brain, // ← NOUVELLE ICÔNE pour l'IA
 } from "lucide-react";
 import { getInitials, cn } from "@/lib/utils";
 import { useFinanceData } from "@/context/FinanceDataContext";
@@ -51,12 +52,21 @@ import { useFinanceData } from "@/context/FinanceDataContext";
 // Menu items
 const navItems = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: Wallet },
-  { href: "/budgets", label: "Budgets", icon: Landmark },
+  { href: "/transactions", label: "Revenus", icon: Wallet },
+  { href: "/budgets", label: "Dépenses", icon: Landmark },
+  
+  
   { href: "/goals", label: "Objectifs", icon: Target },
   { href: "/investments", label: "Investissements", icon: BarChart },
   { href: "/patrimoine", label: "Patrimoine", icon: Home },
   { href: "/debts", label: "Dettes", icon: CreditCard },
+  { 
+    href: "/analyse-ia", 
+    label: "Analyse IA", 
+    icon: Brain,
+    badge: "AI",
+    highlight: true // ← Pour un style spécial
+  },
   { href: "/pass-elite", label: "Pass Elite", icon: Crown },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
@@ -67,7 +77,6 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
-  // Retrieve gamification data to show in the profile dropdown
   const { gameState } = useFinanceData();
 
   // Calculate level progress
@@ -84,26 +93,53 @@ export function Sidebar({ user }: SidebarProps) {
         <SidebarMenu className="gap-y-1 px-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
+            const isHighlighted = item.highlight;
+            
             return (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}
                   tooltip={item.label}
-                  className={`transition-all duration-200 group ${
-                    isActive 
+                  className={cn(
+                    "transition-all duration-200 group relative",
+                    isActive && isHighlighted
+                      ? "bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 text-purple-600 dark:text-purple-400 font-medium"
+                      : isActive 
                       ? "bg-gradient-to-r from-indigo-500/10 to-transparent text-indigo-600 dark:text-indigo-400 font-medium" 
                       : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
+                  )}
                 >
                   <Link href={item.href} className="flex items-center gap-3">
                     <item.icon className={cn(
                       "h-4 w-4 transition-colors", 
-                      isActive ? "text-indigo-600 dark:text-indigo-400" : "group-hover:text-foreground"
+                      isActive && isHighlighted
+                        ? "text-purple-600 dark:text-purple-400"
+                        : isActive 
+                        ? "text-indigo-600 dark:text-indigo-400" 
+                        : "group-hover:text-foreground"
                     )} />
-                    <span>{item.label}</span>
+                    <span className="flex-1">{item.label}</span>
+                    
+                    {/* Badge pour l'onglet IA */}
+                    {item.badge && (
+                      <Badge 
+                        variant="secondary"
+                        className={cn(
+                          "ml-auto text-[9px] px-1.5 py-0 h-4 font-bold",
+                          isHighlighted && "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0"
+                        )}
+                      >
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
+                
+                {/* Glow effect pour l'onglet IA quand actif */}
+                {isActive && isHighlighted && (
+                  <div className="absolute inset-0 -z-10 rounded-md bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20 blur-xl opacity-50" />
+                )}
               </SidebarMenuItem>
             );
           })}
@@ -171,9 +207,16 @@ export function Sidebar({ user }: SidebarProps) {
                 
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link href="/settings">
+                    <Link href="/pass-elite">
                         <Sparkles className="mr-2 h-4 w-4 text-indigo-500" />
                         Pass Elite
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/analyse-ia">
+                        <Brain className="mr-2 h-4 w-4 text-purple-500" />
+                        Analyse IA
+                        <Badge className="ml-auto h-4 px-1 text-[9px] bg-gradient-to-r from-purple-600 to-pink-600 border-0">AI</Badge>
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
