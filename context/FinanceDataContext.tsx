@@ -1,15 +1,20 @@
+// ============================================================================
+// FILE: context/FinanceDataContext.tsx
+// ============================================================================
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState, Investment } from '@/types';
 import { calculerMontantMensuel } from '@/utils/financeCalculations';
 import { DEFAULT_QUESTS } from '@/constants/index';
-// Import the Server Action
+// Import the Server Actions
 import { generateFinancialInsights } from '@/lib/actions/ai.actions';
+import { getGameState } from '@/lib/actions/gamification.actions'; // Ensure this action is exported
+import { siteConfig } from '@/lib/config';
 
 type StrategieDette = 'avalanche' | 'boule de neige';
 
-// Define the shape of the AI response here (or import from types if centralized)
 export interface DeepInsightsData {
   financialScore: number;
   financialPersona: string;
@@ -46,11 +51,9 @@ interface FinanceDataContextType {
   actifs: Actif[];
   setActifs: React.Dispatch<React.SetStateAction<Actif[]>>;
   tropheesDeverrouilles: Trophee[];
-  // AI Logic
   analyserAvecIA: () => Promise<void>;
   chargementIA: boolean;
-  aiInsights: DeepInsightsData | null; // Added to store the result
-  
+  aiInsights: DeepInsightsData | null; 
   budgets: Budget[];
   setBudgets: React.Dispatch<React.SetStateAction<Budget[]>>;
   gameState: GameState;
@@ -59,6 +62,7 @@ interface FinanceDataContextType {
   setInvestissements: React.Dispatch<React.SetStateAction<Investment[]>>;
   strategieDette: StrategieDette;
   setStrategieDette: React.Dispatch<React.SetStateAction<StrategieDette>>;
+  refreshGameState: () => Promise<void>;
 }
 
 const FinanceDataContext = createContext<FinanceDataContextType | undefined>(undefined);
@@ -89,6 +93,53 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
 
   const [strategieDette, setStrategieDette] = useState<StrategieDette>('avalanche');
   const [gameState, setGameState] = useState<GameState>(initialGameState);
+
+  // --- Sync GameState with Server on Mount ---
+  const refreshGameState = async () => {
+    try {
+      const serverState = await getGameState();
+      if (serverState) {
+        // Map Prisma JSON/structure to Frontend types if needed
+        // Assuming simple mapping for now
+        setGameState(prev => ({
+            ...prev,
+            ...serverState,
+            quests: prev.quests // Keep client quests or fetch from DB if stored
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch game state", e);
+    }
+  };
+
+  useEffect(() => {
+    refreshGameState();
+  }, []);
+
+  // Helper to handle local level ups immediately
+  const updateLocalGameState = (xpToAdd: number) => {
+    setGameState(prev => {
+        let newXp = prev.xp + xpToAdd;
+        let newLevel = prev.level;
+        
+        // Use config to check for level up
+        const xpThresholds = siteConfig.gamification.xpToNextLevel;
+        let threshold = xpThresholds[newLevel - 1] || Infinity;
+
+        // While XP is greater than threshold, level up and subtract XP
+        while (newXp >= threshold) {
+            newXp -= threshold;
+            newLevel++;
+            threshold = xpThresholds[newLevel - 1] || Infinity;
+        }
+
+        return {
+            ...prev,
+            xp: newXp,
+            level: newLevel
+        };
+    });
+  };
 
   // Mise à jour des quêtes en fonction des données
   useEffect(() => {
@@ -124,18 +175,35 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
         (q, i) => q.completed && !prev.quests[i].completed
       );
       
-      let newXP = prev.xp;
+      let xpToAdd = 0;
       let newCoins = prev.coins;
       
       newlyCompletedQuests.forEach(quest => {
-        newXP += quest.xpReward;
+        xpToAdd += quest.xpReward;
         newCoins += quest.coinReward;
       });
+
+      // Use the level-up logic helper logic inside the reducer isn't clean,
+      // so we do a simple approximation here or move logic out. 
+      // For simplicity, we just add raw XP here and let the server sync later 
+      // OR re-implement the level-up logic:
+      
+      let newXp = prev.xp + xpToAdd;
+      let newLevel = prev.level;
+      const xpThresholds = siteConfig.gamification.xpToNextLevel;
+      let threshold = xpThresholds[newLevel - 1] || Infinity;
+
+      while (newXp >= threshold) {
+          newXp -= threshold;
+          newLevel++;
+          threshold = xpThresholds[newLevel - 1] || Infinity;
+      }
 
       return {
         ...prev,
         quests: updatedQuests,
-        xp: newXP,
+        xp: newXp,
+        level: newLevel,
         coins: newCoins,
       };
     });
@@ -170,14 +238,16 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const analyserAvecIA = async () => {
     setChargementIA(true);
     try {
-      // Calls the Server Action defined in lib/actions/ai.actions.ts
       const result = await generateFinancialInsights();
       
       if (result.error) {
         console.error("AI Analysis Failed:", result.error);
-        // You could also add a toast notification here if you import useToast
       } else {
         setAiInsights(result as DeepInsightsData);
+        // Update Local State immediately for visual feedback
+        updateLocalGameState(siteConfig.gamification.xpEvents.AI_ANALYSIS);
+        // Trigger server sync in background
+        refreshGameState();
       }
     } catch (error) {
       console.error("Unexpected error during AI analysis:", error);
@@ -203,7 +273,7 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
     tropheesDeverrouilles: [],
     analyserAvecIA,
     chargementIA,
-    aiInsights, // Expose the data
+    aiInsights, 
     budgets,
     setBudgets,
     gameState,
@@ -212,6 +282,7 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
     setInvestissements,
     strategieDette,
     setStrategieDette,
+    refreshGameState
   };
 
   return (

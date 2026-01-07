@@ -8,8 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { 
   Brain, 
   Sparkles, 
-  TrendingUp, 
-  TrendingDown, 
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -39,10 +37,13 @@ export default function AnalyseIAPage() {
     revenus,
     depenses,
     actifs,
-    passifs,
+    // passifs, // RETIRÉ: N'existe pas dans le contexte
     gameState,
     setGameState
   } = useFinanceData()
+
+  // CORRECTION 1 : On dérive les passifs (dettes) depuis les dépenses de type 'credit'
+  const passifs = depenses.filter(d => d.categorie === 'credit');
 
   const [analyse, setAnalyse] = useState<AnalyseIA | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -52,10 +53,8 @@ export default function AnalyseIAPage() {
   useEffect(() => {
     const autostart = searchParams.get('autostart')
     if (autostart === 'true' && !analyse && !isLoading) {
-      // Attendre un peu pour l'animation de transition de page
       const timer = setTimeout(() => {
         handleAnalyse()
-        // Nettoyer l'URL pour éviter de relancer à chaque refresh
         router.replace('/analyse-ia', { scroll: false })
       }, 500)
       
@@ -93,9 +92,11 @@ export default function AnalyseIAPage() {
             type: a.type,
             valeur: a.valeur
           })),
+          // CORRECTION 2 : Utilisation de la variable dérivée passifs avec sécurisation
           passifs: passifs.map(p => ({
             nom: p.nom,
-            montant: p.montant
+            // On s'assure d'avoir une valeur numérique valide
+            montant: parseFloat(p.montantTotal || p.montant || '0')
           }))
         },
         cashFlow: cashFlow,
@@ -105,7 +106,6 @@ export default function AnalyseIAPage() {
         }
       }
 
-      // Appel API (remplace par ton vrai endpoint)
       const response = await fetch('/api/analyse-ia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +119,6 @@ export default function AnalyseIAPage() {
       const data: AnalyseIA = await response.json()
       setAnalyse(data)
 
-      // Récompense gamification : +50 XP
       if (gameState && setGameState) {
         setGameState({
           ...gameState,
@@ -131,18 +130,22 @@ export default function AnalyseIAPage() {
       console.error('Erreur analyse:', err)
       setError('Une erreur est survenue lors de l\'analyse. Utilisation de données de démonstration.')
       
-      // En cas d'erreur, utiliser des données mockées pour la démo
+      // CORRECTION 3 : Calcul du score sécurisé (évite NaN si revenus = 0)
+      const calculatedScore = totalRevenusMensuel > 0 
+        ? Math.min(100, Math.max(0, 70 + Math.floor((cashFlow / totalRevenusMensuel) * 30)))
+        : 50; // Score par défaut si pas de revenus
+
       const mockData: AnalyseIA = {
-        score: Math.min(100, Math.max(0, 70 + Math.floor((cashFlow / totalRevenusMensuel) * 30))),
+        score: calculatedScore,
         resume: "Votre situation financière présente des opportunités d'amélioration intéressantes.",
         pointsForts: [
-          totalRevenusMensuel > totalDepensesMensuel ? "Flux de trésorerie positif" : "Revenus stables",
+          totalRevenusMensuel >= totalDepensesMensuel ? "Flux de trésorerie positif" : "Potentiel d'optimisation",
           `${revenus.length} source${revenus.length > 1 ? 's' : ''} de revenus`,
           `Patrimoine de ${formaterMontant(patrimoineNet)}`,
-          actifs.length > 0 ? "Présence d'actifs diversifiés" : "Début de constitution patrimoniale"
+          actifs.length > 0 ? "Présence d'actifs diversifiés" : "Opportunité de débuter l'investissement"
         ],
         pointsFaibles: [
-          totalDepensesMensuel > totalRevenusMensuel * 0.7 ? "Ratio dépenses/revenus à optimiser" : "Gestion budgétaire à affiner",
+          totalDepensesMensuel > totalRevenusMensuel * 0.7 ? "Ratio dépenses/revenus élevé" : "Gestion budgétaire à affiner",
           "Diversification des actifs à améliorer",
           "Épargne de précaution à renforcer",
           depenses.length > 10 ? "Nombreuses dépenses à rationaliser" : "Structure de dépenses à optimiser"
@@ -152,21 +155,21 @@ export default function AnalyseIAPage() {
             priorite: 1,
             titre: "Optimiser le budget mensuel",
             description: "Réduisez vos dépenses de 10% en identifiant les postes non essentiels pour augmenter votre capacité d'épargne.",
-            economie: `${formaterMontant(totalDepensesMensuel * 0.1)}/mois`,
+            economie: `${formaterMontant(Math.max(50, totalDepensesMensuel * 0.1))}/mois`,
             delai: "Immédiat"
           },
           {
             priorite: 2,
             titre: "Constituer un fonds d'urgence",
             description: "Épargnez progressivement l'équivalent de 3 à 6 mois de dépenses pour faire face aux imprévus.",
-            economie: `${formaterMontant(totalDepensesMensuel * 3)} objectif`,
+            economie: `${formaterMontant(Math.max(1000, totalDepensesMensuel * 3))} objectif`,
             delai: "6-12 mois"
           },
           {
             priorite: 3,
             titre: "Diversifier vos revenus",
             description: "Explorez des sources de revenus complémentaires (freelance, investissements, placements) pour sécuriser votre situation.",
-            economie: `+${formaterMontant(totalRevenusMensuel * 0.2)}/mois potentiel`,
+            economie: `+${formaterMontant(Math.max(100, totalRevenusMensuel * 0.2))}/mois potentiel`,
             delai: "Moyen terme"
           }
         ],
@@ -306,7 +309,7 @@ export default function AnalyseIAPage() {
               <h2 className={cn("text-2xl font-bold mb-4", currentTheme.colors.text)}>Votre Score Financier</h2>
               <div className="flex items-center justify-center gap-2 mb-4">
                 <p className={`text-8xl font-black ${getScoreColor(analyse.score)}`}>
-                  {analyse.score}
+                  {isNaN(analyse.score) ? 0 : analyse.score}
                 </p>
                 <span className={cn("text-4xl font-bold", currentTheme.colors.subtext)}>/100</span>
               </div>

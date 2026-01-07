@@ -1,54 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trash2, Target } from 'lucide-react'; // PlusCircle and AlertTriangle were unused in render
-import type { Objectif } from '@/types';
-import { formaterMontant } from '@/utils/financeCalculations';
-import { CADEAUX_OBJECTIFS } from '@/constants';
+import { Trash2, Target, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useFinanceData } from '@/context/FinanceDataContext';
 import { cn } from '@/lib/utils';
 import { Empty } from '@/components/ui/empty';
 import { AddGoalDialog } from '@/components/goals/add-goal-dialog';
+import { formaterMontant } from '@/utils/financeCalculations';
+import { CADEAUX_OBJECTIFS } from '@/constants';
 
 export default function GoalsPage() {
   const { objectifs, setObjectifs } = useFinanceData();
-  const [nouvelObjectif, setNouvelObjectif] = useState({ nom: '', montantCible: '', montantActuel: '0' });
-  const [error, setError] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const { currentTheme } = useTheme();
-
-  const ajouterObjectif = () => {
-    const cible = parseFloat(nouvelObjectif.montantCible);
-    const actuel = parseFloat(nouvelObjectif.montantActuel);
-
-    if (!nouvelObjectif.nom.trim()) {
-      setError("Le nom de l'objectif est requis.");
-      return;
-    }
-    if (isNaN(cible) || cible <= 0) {
-      setError("Le montant cible doit être un nombre positif.");
-      return;
-    }
-    if (isNaN(actuel) || actuel < 0) {
-      setError("Le montant actuel est invalide.");
-      return;
-    }
-    if (actuel > cible) {
-      setError("Le montant actuel ne peut pas dépasser le montant cible.");
-      return;
-    }
-    setError('');
-    setObjectifs([...objectifs, { ...nouvelObjectif, id: Date.now() }]);
-    setNouvelObjectif({ nom: '', montantCible: '', montantActuel: '0' });
-  };
 
   const confirmerSuppression = (id: number) => {
     setDeleteConfirmId(id);
   };
 
-  // Note: These functions were defined but not fully utilized in the UI (modal logic missing),
-  // but kept to maintain original logic.
   const annulerSuppression = () => {
     setDeleteConfirmId(null);
   };
@@ -64,33 +34,77 @@ export default function GoalsPage() {
     const obj = objectifs.find(o => o.id === id);
     if (!obj) return;
     
-    const montantNum = parseFloat(nouveauMontant);
-    if (isNaN(montantNum) || montantNum < 0 || montantNum > parseFloat(obj.montantCible)) {
-      return;
+    // Allow empty string for typing
+    if (nouveauMontant === '') {
+       setObjectifs(objectifs.map(o => o.id === id ? { ...o, montantActuel: '' } : o));
+       return;
     }
+
+    const montantNum = parseFloat(nouveauMontant);
+    if (isNaN(montantNum) || montantNum < 0) return;
+    
     setObjectifs(objectifs.map(o => o.id === id ? { ...o, montantActuel: nouveauMontant } : o));
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold leading-none tracking-tight font-roboto">
-          Financial Goals
-        </h1>
+    <div className="space-y-6 animate-fadeIn relative pb-12">
+      
+      {/* Modal de confirmation */}
+      {deleteConfirmId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className={cn(
+            "rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4 border transform transition-all scale-100",
+            currentTheme.colors.card,
+            currentTheme.colors.border
+          )}>
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className={cn("text-xl font-bold", currentTheme.colors.text)}>
+                Delete Goal?
+              </h3>
+              <p className={currentTheme.colors.subtext}>
+                Are you sure you want to remove this financial goal?
+              </p>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={annulerSuppression}
+                  className={cn(
+                    "flex-1 px-4 py-2 rounded-xl border font-semibold transition-colors hover:opacity-80",
+                    currentTheme.colors.border,
+                    currentTheme.colors.text
+                  )}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executerSuppression}
+                  className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 shadow-lg shadow-red-500/30 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className={cn("text-3xl font-bold", currentTheme.colors.text)}>
+            Financial Goals
+          </h1>
+          <p className={cn("text-sm", currentTheme.colors.subtext)}>
+            Track your savings and reach your targets.
+          </p>
+        </div>
+        {/* The Dialog Component is used here */}
         <AddGoalDialog />
       </div>
 
-      {/* FIXED: Added ternary start here */}
       {objectifs.length > 0 ? (
-        <div className={cn(
-          "rounded-2xl p-6 shadow-xl border backdrop-blur-xl",
-          currentTheme.colors.card,
-          currentTheme.colors.border
-        )}>
-          <h3 className={cn("text-xl font-bold mb-4", currentTheme.colors.text)}>
-            Mes objectifs ({objectifs.length})
-          </h3>
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {objectifs.map(obj => {
               const montantActuel = parseFloat(obj.montantActuel) || 0;
               const montantCible = parseFloat(obj.montantCible) || 1;
@@ -101,58 +115,72 @@ export default function GoalsPage() {
                 <div
                   key={obj.id}
                   className={cn(
-                    "p-4 rounded-xl border",
-                    currentTheme.colors.border,
-                    currentTheme.isDark ? "bg-slate-800/40" : "bg-gray-50"
+                    "relative p-6 rounded-2xl border shadow-lg transition-all hover:shadow-xl",
+                    currentTheme.colors.card,
+                    currentTheme.colors.border
                   )}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={cn("font-bold", currentTheme.colors.text)}>{obj.nom}</span>
-                    {/* Direct delete for simplicity based on provided UI, can be swapped for Confirm Dialog */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            "p-3 rounded-xl", 
+                            currentTheme.isDark ? "bg-slate-800" : "bg-indigo-50"
+                        )}>
+                            <Target className="w-6 h-6 text-indigo-500" />
+                        </div>
+                        <div>
+                            <h3 className={cn("font-bold text-lg", currentTheme.colors.text)}>{obj.nom}</h3>
+                            <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300")}>
+                                In Progress
+                            </span>
+                        </div>
+                    </div>
                     <button
-                      onClick={() => executerSuppression()} 
-                      onMouseDown={() => confirmerSuppression(obj.id)}
-                      className="p-2 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                      onClick={() => confirmerSuppression(obj.id)}
+                      className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          currentTheme.isDark ? "hover:bg-slate-800 text-slate-400 hover:text-red-400" : "hover:bg-slate-100 text-slate-400 hover:text-red-500"
+                      )}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className={cn("text-sm mb-2", currentTheme.colors.subtext)}>
-                    {formaterMontant(montantActuel)} / {formaterMontant(montantCible)}
+
+                  <div className="flex justify-between items-end mb-2">
+                     <div className={cn("text-3xl font-bold", currentTheme.colors.text)}>
+                        {formaterMontant(montantActuel)}
+                     </div>
+                     <div className={cn("text-sm mb-1", currentTheme.colors.subtext)}>
+                        of {formaterMontant(montantCible)}
+                     </div>
                   </div>
-                  <div className={cn("w-full rounded-full h-4", currentTheme.isDark ? "bg-slate-700" : "bg-gray-200")}>
+
+                  {/* Progress Bar */}
+                  <div className={cn("w-full rounded-full h-3 mb-6 overflow-hidden", currentTheme.isDark ? "bg-slate-800" : "bg-slate-100")}>
                     <div
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-4 rounded-full text-center text-white text-xs font-bold flex items-center justify-center transition-all duration-500"
-                      style={{ width: `${Math.max(progression, 10)}%` }}
+                      className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 ease-out relative"
+                      style={{ width: `${Math.max(progression, 5)}%` }}
                     >
-                      {progression.toFixed(0)}%
+                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                     </div>
                   </div>
 
-                  {/* Récompenses débloquées */}
+                  {/* Rewards Section */}
                   {cadeauxDebloques.length > 0 && (
                     <div className={cn("mt-4 pt-4 border-t", currentTheme.colors.border)}>
-                      <h4 className={cn("font-semibold mb-2", currentTheme.colors.text)}>
-                        Récompenses débloquées
+                      <h4 className={cn("text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1", currentTheme.colors.subtext)}>
+                        <TrendingUp className="w-3 h-3" /> Unlocked Milestones
                       </h4>
-                      <div className="flex flex-wrap gap-4">
-                        {cadeauxDebloques.map(cadeau => {
+                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        {cadeauxDebloques.map((cadeau, index) => {
                           const Icon = cadeau.icon;
                           return (
                             <div
-                              key={cadeau.nom}
-                              className={`relative overflow-hidden flex-1 min-w-[150px] p-4 rounded-xl bg-gradient-to-br ${cadeau.gradient} text-white shadow-lg flex flex-col items-center justify-center`}
+                              key={index}
+                              className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-br ${cadeau.gradient} text-white shadow-md`}
                             >
-                              <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                                <Icon className="w-24 h-24" />
-                              </div>
-                              <div className="relative text-center">
-                                <div className="flex justify-center mb-2">
-                                  <Icon className="w-10 h-10" />
-                                </div>
-                                <div className="font-bold text-lg">{cadeau.nom}</div>
-                                <p className="text-xs text-white/90">{cadeau.description}</p>
-                              </div>
+                                <Icon className="w-4 h-4" />
+                                <span className="text-xs font-bold">{cadeau.nom}</span>
                             </div>
                           );
                         })}
@@ -160,19 +188,21 @@ export default function GoalsPage() {
                     </div>
                   )}
 
-                  {/* Mise à jour du montant */}
-                  <div className="mt-4">
-                    <label className={cn("text-xs", currentTheme.colors.subtext)}>
-                      Mettre à jour le montant actuel:
+                  {/* Quick Add Funds */}
+                  <div className={cn(
+                      "mt-4 p-3 rounded-xl flex items-center gap-3",
+                      currentTheme.isDark ? "bg-slate-800/50" : "bg-slate-50"
+                  )}>
+                    <label className={cn("text-xs font-medium whitespace-nowrap", currentTheme.colors.subtext)}>
+                      Update Amount:
                     </label>
                     <input
                       type="number"
                       value={obj.montantActuel}
                       onChange={(e) => mettreAJourObjectif(obj.id, e.target.value)}
+                      placeholder="0.00"
                       className={cn(
-                        "w-full mt-1 px-3 py-2 text-sm rounded-lg border outline-none transition-all focus:border-purple-500",
-                        currentTheme.colors.input,
-                        currentTheme.colors.border,
+                        "w-full bg-transparent border-none outline-none text-sm font-bold text-right",
                         currentTheme.colors.text
                       )}
                     />
@@ -180,14 +210,15 @@ export default function GoalsPage() {
                 </div>
               );
             })}
-          </div>
         </div>
       ) : (
-        <Empty>
-          <Target className="h-12 w-12 text-muted-foreground" />
-          <div className="text-center">
-            <h3 className="text-lg font-semibold font-roboto">No Goals Yet</h3>
-            <p className="text-muted-foreground text-sm mt-1">
+        <Empty className={cn("border-dashed", currentTheme.colors.border)}>
+          <div className={cn("p-4 rounded-full bg-muted/50 mb-4")}>
+             <Target className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div className="text-center space-y-2">
+            <h3 className={cn("text-lg font-semibold", currentTheme.colors.text)}>No Goals Yet</h3>
+            <p className={currentTheme.colors.subtext}>
               Setting goals is the first step to financial freedom.
             </p>
           </div>

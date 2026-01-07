@@ -1,3 +1,7 @@
+// ============================================================================
+// FILE: components/layout/sidebar.tsx
+// ============================================================================
+
 "use client";
 
 import Link from "next/link";
@@ -44,18 +48,17 @@ import {
   Bell,
   Sparkles,
   ChevronsUpDown,
-  Brain, // ← NOUVELLE ICÔNE pour l'IA
+  Brain,
 } from "lucide-react";
 import { getInitials, cn } from "@/lib/utils";
-import { useFinanceData } from "@/context/FinanceDataContext";
+import { useFinanceData } from '@/context/FinanceDataContext';
+import { siteConfig } from "@/lib/config";
 
 // Menu items
 const navItems = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/transactions", label: "Revenus", icon: Wallet },
   { href: "/budgets", label: "Dépenses", icon: Landmark },
-  
-  
   { href: "/goals", label: "Objectifs", icon: Target },
   { href: "/investments", label: "Investissements", icon: BarChart },
   { href: "/patrimoine", label: "Patrimoine", icon: Home },
@@ -65,7 +68,7 @@ const navItems = [
     label: "Analyse IA", 
     icon: Brain,
     badge: "AI",
-    highlight: true // ← Pour un style spécial
+    highlight: true 
   },
   { href: "/pass-elite", label: "Pass Elite", icon: Crown },
   { href: "/settings", label: "Paramètres", icon: Settings },
@@ -79,9 +82,16 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const { gameState } = useFinanceData();
 
-  // Calculate level progress
-  const nextLevelXp = gameState ? 100 * Math.pow(1.5, gameState.level - 1) : 100;
-  const progressPercent = gameState ? (gameState.xp / nextLevelXp) * 100 : 0;
+  // DYNAMIC XP CALCULATION
+  const currentLevel = gameState?.level || 1;
+  const currentXp = gameState?.xp || 0;
+  
+  // Get max XP for current level from config, fallback to last defined value or 1000
+  const xpThresholds = siteConfig.gamification.xpToNextLevel;
+  const nextLevelXp = xpThresholds[currentLevel - 1] || xpThresholds[xpThresholds.length - 1] || 1000;
+  
+  // Calculate percentage
+  const progressPercent = Math.min(100, Math.max(0, (currentXp / nextLevelXp) * 100));
 
   return (
     <ShadcnSidebar collapsible="icon">
@@ -121,7 +131,6 @@ export function Sidebar({ user }: SidebarProps) {
                     )} />
                     <span className="flex-1">{item.label}</span>
                     
-                    {/* Badge pour l'onglet IA */}
                     {item.badge && (
                       <Badge 
                         variant="secondary"
@@ -136,7 +145,6 @@ export function Sidebar({ user }: SidebarProps) {
                   </Link>
                 </SidebarMenuButton>
                 
-                {/* Glow effect pour l'onglet IA quand actif */}
                 {isActive && isHighlighted && (
                   <div className="absolute inset-0 -z-10 rounded-md bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20 blur-xl opacity-50" />
                 )}
@@ -189,16 +197,18 @@ export function Sidebar({ user }: SidebarProps) {
                   </div>
                 </DropdownMenuLabel>
                 
-                {/* Gamification Status Section */}
+                {/* DYNAMIC GAMIFICATION STATUS */}
                 <div className="px-2 py-2 bg-muted/30 rounded-md mx-1 my-1">
                     <div className="flex justify-between items-center mb-1.5">
                         <div className="flex items-center gap-1.5">
                             <div className="bg-amber-100 p-1 rounded-md dark:bg-amber-900/40">
                                 <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                             </div>
-                            <span className="text-xs font-semibold text-foreground">Niveau {gameState?.level || 1}</span>
+                            <span className="text-xs font-semibold text-foreground">Niveau {currentLevel}</span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground">{Math.floor(gameState?.xp || 0)} / {Math.floor(nextLevelXp)} XP</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {currentXp} / {nextLevelXp} XP
+                        </span>
                     </div>
                     <Progress value={progressPercent} className="h-1.5" />
                 </div>
@@ -247,7 +257,6 @@ export function Sidebar({ user }: SidebarProps) {
                 
                 <DropdownMenuSeparator />
                 
-                {/* Embedded Theme Toggle in Menu */}
                 <div className="flex items-center justify-between px-2 py-1.5">
                     <span className="text-sm">Thème</span>
                     <ThemeToggle /> 

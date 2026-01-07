@@ -70,8 +70,8 @@ export default function TransactionsPage() {
             currentTheme.colors.border
           )}>
             <div className="flex flex-col items-center text-center gap-4">
-              <div className="p-3 bg-red-100 rounded-full">
-                <AlertTriangle className="w-8 h-8 text-red-600" />
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
               </div>
               <h3 className={cn("text-xl font-bold", currentTheme.colors.text)}>
                 Confirmer la suppression
@@ -202,7 +202,7 @@ export default function TransactionsPage() {
                 className={cn(
                   "flex items-center justify-between p-4 rounded-xl border hover:shadow-lg transition-all", 
                   currentTheme.colors.border, 
-                  currentTheme.isDark ? "bg-slate-800/40" : "bg-gradient-to-r from-emerald-50 to-teal-50"
+                  currentTheme.isDark ? "bg-slate-800/40" : "bg-slate-50/80"
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -221,7 +221,10 @@ export default function TransactionsPage() {
                 </div>
                 <button 
                   onClick={() => confirmerSuppression(rev.id)} 
-                  className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    currentTheme.isDark ? "bg-red-900/20 text-red-400 hover:bg-red-900/40" : "bg-red-100 text-red-600 hover:bg-red-200"
+                  )}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

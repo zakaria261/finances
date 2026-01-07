@@ -1,4 +1,7 @@
-// lib/config.ts
+// ============================================================================
+// FILE: lib/config.ts
+// ============================================================================
+
 export const siteConfig = {
   name: "Finances Expert Pro",
   description: "The Smart Way to Manage Your Personal Finances.",
@@ -9,20 +12,23 @@ export const siteConfig = {
   ],
   gamification: {
     xpEvents: {
-        "ADD_TRANSACTION": 10,
-        "ADD_GOAL": 25,
-        "FUND_GOAL": 15,
-        "ADD_BUDGET": 20,
-        "ADD_INVESTMENT": 20,
-        "ADD_ASSET": 15,
-        "ADD_DEBT": 15,
+      "ADD_TRANSACTION": 10,
+      "ADD_GOAL": 25,
+      "FUND_GOAL": 15,
+      "ADD_BUDGET": 20,
+      "ADD_INVESTMENT": 20,
+      "ADD_ASSET": 15,
+      "ADD_DEBT": 15,
+      "AI_ANALYSIS": 50, // Added this one
     },
-    // Cumulative XP to reach the next level (index 0 is for level 2)
-    xpToNextLevel: [100, 150, 200, 250, 300, 400, 500],
+    // XP needed to complete the CURRENT level and reach the NEXT one.
+    // Index 0 = Level 1 (needs 100XP to reach Lvl 2)
+    // Index 1 = Level 2 (needs 150XP to reach Lvl 3)
+    xpToNextLevel: [100, 150, 200, 250, 300, 400, 500, 600, 800, 1000], 
     rewards: [
-        { level: 2, name: "Advanced Charts"},
-        { level: 3, name: "New Theme"},
-        { level: 5, name: "CSV Export"},
+      { level: 2, name: "Advanced Charts" },
+      { level: 3, name: "New Theme" },
+      { level: 5, name: "CSV Export" },
     ]
   }
 };

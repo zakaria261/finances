@@ -1,4 +1,7 @@
-// lib/actions/gamification.actions.ts (NEW FILE)
+// ============================================================================
+// FILE: lib/actions/gamification.actions.ts
+// ============================================================================
+
 "use server";
 
 import { getServerSession } from "next-auth";
@@ -16,40 +19,53 @@ export async function getGameState() {
     });
 
     if (!gameState) {
+        // Create initial state if it doesn't exist
         gameState = await prisma.gameState.create({
-            data: { userId }
+            data: { 
+                userId,
+                xp: 0,
+                level: 1,
+                //coins: 100,
+            }
         });
     }
 
     return gameState;
 }
 
-type XpEvent = "ADD_TRANSACTION" | "ADD_GOAL" | "FUND_GOAL" | "ADD_BUDGET" | "ADD_INVESTMENT" | "ADD_ASSET" | "ADD_DEBT";
+// Define the keys from your config
+type XpEvent = keyof typeof siteConfig.gamification.xpEvents;
 
 export async function addXp(event: XpEvent) {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) return null;
     const userId = session.user.id;
     
+    // Get XP amount from config
     const xpAmount = siteConfig.gamification.xpEvents[event] || 0;
-    if (xpAmount === 0) return;
+    if (xpAmount === 0) return null;
 
     const gameState = await getGameState();
-    if (!gameState) return;
+    if (!gameState) return null;
 
     let { xp, level } = gameState;
     xp += xpAmount;
 
-    // Check for level up
-    let xpToNextLevel = siteConfig.gamification.xpToNextLevel[level - 1];
-    while (xpToNextLevel && xp >= xpToNextLevel) {
+    // Check for level up using config
+    // Array is 0-indexed. Level 1 needs xpToNextLevel[0]
+    let xpNeeded = siteConfig.gamification.xpToNextLevel[level - 1];
+
+    // While loop to handle multiple level ups at once (if massive XP gain)
+    while (xpNeeded && xp >= xpNeeded) {
+        xp -= xpNeeded; // Reset relative XP
         level++;
-        xp -= xpToNextLevel;
-        xpToNextLevel = siteConfig.gamification.xpToNextLevel[level - 1];
+        xpNeeded = siteConfig.gamification.xpToNextLevel[level - 1];
     }
 
-    await prisma.gameState.update({
+    const updatedState = await prisma.gameState.update({
         where: { userId },
         data: { xp, level },
     });
+
+    return updatedState;
 }

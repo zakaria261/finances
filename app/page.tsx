@@ -20,7 +20,7 @@ export default function LandingPage() {
           ctaText="Get Started for Free"
           ctaLink="/register"
           mockupImage={{
-            src: "/dashboard-mockup.png",
+            src: "/dashboard.png",
             alt: "Finances Expert Pro Dashboard",
             width: 1440,
             height: 900,

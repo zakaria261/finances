@@ -1,11 +1,9 @@
-// components/layout/
-
 "use client";
 
 import Link from "next/link";
 import { User } from "next-auth";
 import { signOut } from "next-auth/react";
-import { Search, LogOut, Settings } from "lucide-react";
+import { LogOut, Settings } from "lucide-react"; // Removed 'Search' import
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,10 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { GlobalSearch } from "@/components/layout/global-search";
 
 interface HeaderMainProps {
   user: User;
@@ -33,13 +31,10 @@ export function HeaderMain({ user }: HeaderMainProps) {
       </div>
 
       <div className="relative ml-auto flex-1 md:grow-0">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search..."
-          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-        />
+        {/* Replaced static input with functional Command Palette */}
+        <GlobalSearch />
       </div>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

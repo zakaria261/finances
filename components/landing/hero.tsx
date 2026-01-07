@@ -98,7 +98,7 @@ export function Hero({
           )}
 
           {/* Main Heading */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[1.1] max-w-6xl tracking-tight text-center">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-thin leading-[1.1] max-w-6xl tracking-tight text-center">
             {title}
           </h1>
 

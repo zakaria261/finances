@@ -504,6 +504,460 @@ export default function RegisterPage() {
 }
 
 // ============================================================================
+// FILE: app/(main)/analyse-ia/page.tsx
+// ============================================================================
+
+"use client"
+
+import React, { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+  Brain, 
+  Sparkles, 
+  TrendingUp, 
+  TrendingDown, 
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Trophy,
+  RefreshCw,
+  Zap,
+  Lightbulb,
+  Target,
+  ArrowRight
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useTheme } from '@/context/ThemeContext'
+import { useFinanceData } from '@/context/FinanceDataContext'
+import { formaterMontant } from '@/utils/financeCalculations'
+import type { AnalyseIA } from '@/types/analyse'
+
+export default function AnalyseIAPage() {
+  const { currentTheme } = useTheme()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  const {
+    cashFlow,
+    totalRevenusMensuel,
+    totalDepensesMensuel,
+    patrimoineNet,
+    revenus,
+    depenses,
+    actifs,
+    passifs,
+    gameState,
+    setGameState
+  } = useFinanceData()
+
+  const [analyse, setAnalyse] = useState<AnalyseIA | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Auto-start l'analyse si le paramètre autostart=true est présent
+  useEffect(() => {
+    const autostart = searchParams.get('autostart')
+    if (autostart === 'true' && !analyse && !isLoading) {
+      // Attendre un peu pour l'animation de transition de page
+      const timer = setTimeout(() => {
+        handleAnalyse()
+        // Nettoyer l'URL pour éviter de relancer à chaque refresh
+        router.replace('/analyse-ia', { scroll: false })
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
+
+  const handleAnalyse = async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Préparer les données pour l'IA
+      const financialSnapshot = {
+        revenus: {
+          total: totalRevenusMensuel,
+          sources: revenus.map(r => ({
+            nom: r.nom,
+            montant: r.montant,
+            frequence: r.frequence
+          }))
+        },
+        depenses: {
+          total: totalDepensesMensuel,
+          detail: depenses.map(d => ({
+            nom: d.nom,
+            montant: d.montant,
+            categorie: d.categorie,
+            frequence: d.frequence
+          }))
+        },
+        patrimoine: {
+          net: patrimoineNet,
+          actifs: actifs.map(a => ({
+            type: a.type,
+            valeur: a.valeur
+          })),
+          passifs: passifs.map(p => ({
+            nom: p.nom,
+            montant: p.montant
+          }))
+        },
+        cashFlow: cashFlow,
+        metriques: {
+          ratioDepensesRevenus: totalRevenusMensuel > 0 ? (totalDepensesMensuel / totalRevenusMensuel) * 100 : 0,
+          tauxEpargne: totalRevenusMensuel > 0 ? ((totalRevenusMensuel - totalDepensesMensuel) / totalRevenusMensuel) * 100 : 0
+        }
+      }
+
+      // Appel API (remplace par ton vrai endpoint)
+      const response = await fetch('/api/analyse-ia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(financialSnapshot)
+      })
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'analyse')
+      }
+
+      const data: AnalyseIA = await response.json()
+      setAnalyse(data)
+
+      // Récompense gamification : +50 XP
+      if (gameState && setGameState) {
+        setGameState({
+          ...gameState,
+          xp: gameState.xp + 50
+        })
+      }
+
+    } catch (err) {
+      console.error('Erreur analyse:', err)
+      setError('Une erreur est survenue lors de l\'analyse. Utilisation de données de démonstration.')
+      
+      // En cas d'erreur, utiliser des données mockées pour la démo
+      const mockData: AnalyseIA = {
+        score: Math.min(100, Math.max(0, 70 + Math.floor((cashFlow / totalRevenusMensuel) * 30))),
+        resume: "Votre situation financière présente des opportunités d'amélioration intéressantes.",
+        pointsForts: [
+          totalRevenusMensuel > totalDepensesMensuel ? "Flux de trésorerie positif" : "Revenus stables",
+          `${revenus.length} source${revenus.length > 1 ? 's' : ''} de revenus`,
+          `Patrimoine de ${formaterMontant(patrimoineNet)}`,
+          actifs.length > 0 ? "Présence d'actifs diversifiés" : "Début de constitution patrimoniale"
+        ],
+        pointsFaibles: [
+          totalDepensesMensuel > totalRevenusMensuel * 0.7 ? "Ratio dépenses/revenus à optimiser" : "Gestion budgétaire à affiner",
+          "Diversification des actifs à améliorer",
+          "Épargne de précaution à renforcer",
+          depenses.length > 10 ? "Nombreuses dépenses à rationaliser" : "Structure de dépenses à optimiser"
+        ],
+        recommandationsPrioritaires: [
+          {
+            priorite: 1,
+            titre: "Optimiser le budget mensuel",
+            description: "Réduisez vos dépenses de 10% en identifiant les postes non essentiels pour augmenter votre capacité d'épargne.",
+            economie: `${formaterMontant(totalDepensesMensuel * 0.1)}/mois`,
+            delai: "Immédiat"
+          },
+          {
+            priorite: 2,
+            titre: "Constituer un fonds d'urgence",
+            description: "Épargnez progressivement l'équivalent de 3 à 6 mois de dépenses pour faire face aux imprévus.",
+            economie: `${formaterMontant(totalDepensesMensuel * 3)} objectif`,
+            delai: "6-12 mois"
+          },
+          {
+            priorite: 3,
+            titre: "Diversifier vos revenus",
+            description: "Explorez des sources de revenus complémentaires (freelance, investissements, placements) pour sécuriser votre situation.",
+            economie: `+${formaterMontant(totalRevenusMensuel * 0.2)}/mois potentiel`,
+            delai: "Moyen terme"
+          }
+        ],
+        conseilsExpert: [
+          "Automatisez vos virements d'épargne dès réception du salaire",
+          "Appliquez la règle du 50/30/20 (50% besoins, 30% envies, 20% épargne)",
+          "Diversifiez vos investissements entre liquidités et placements long terme",
+          "Revoyez vos abonnements mensuels et résiliez ceux non utilisés",
+          "Négociez vos contrats d'assurance pour réduire vos charges fixes"
+        ],
+        optimisationFiscale: `Explorez les dispositifs d'épargne défiscalisée français : PER (Plan Épargne Retraite) pour réduire vos impôts, PEA (Plan d'Épargne en Actions) pour investir en bourse sans fiscalité après 5 ans, et Assurance Vie pour transmettre votre patrimoine. Avec un revenu de ${formaterMontant(totalRevenusMensuel * 12)}/an, vous pourriez économiser jusqu'à ${formaterMontant(totalRevenusMensuel * 12 * 0.11)} d'impôts par an.`
+      }
+      setAnalyse(mockData)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-500'
+    if (score >= 50) return 'text-amber-500'
+    return 'text-red-500'
+  }
+
+  const getScoreGradient = (score: number) => {
+    if (score >= 80) return 'from-emerald-500 to-green-500'
+    if (score >= 50) return 'from-amber-500 to-orange-500'
+    return 'from-red-500 to-pink-500'
+  }
+
+  return (
+    <div className="space-y-8 animate-fadeIn pb-12">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className={cn("text-4xl font-bold mb-2", currentTheme.colors.text)}>
+            Analyse IA
+          </h1>
+          <p className={cn("text-lg", currentTheme.colors.subtext)}>
+            Obtenez des insights personnalisés sur votre situation financière
+          </p>
+        </div>
+        
+        <Button 
+          onClick={handleAnalyse}
+          disabled={isLoading}
+          size="lg"
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105"
+        >
+          {isLoading ? (
+            <>
+              <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+              Analyse en cours...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5 mr-2" />
+              {analyse ? 'Nouvelle Analyse' : 'Lancer l\'Analyse'}
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Info Message when auto-started */}
+      {searchParams.get('autostart') === 'true' && isLoading && (
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-pulse" />
+            <p className="text-blue-800 dark:text-blue-200">Analyse IA en cours de génération...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
+          <CardContent className="p-4 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <p className="text-amber-800 dark:text-amber-200">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Analysis State */}
+      {!analyse && !isLoading && (
+        <Card className={cn(
+          "relative overflow-hidden border-none",
+          currentTheme.isDark 
+            ? "bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20" 
+            : "bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50"
+        )}>
+          <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-white/10 pointer-events-none" />
+          
+          <CardContent className="p-12 text-center relative z-10">
+            <div className="inline-flex p-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-3xl mb-6">
+              <Brain className={cn("w-24 h-24", currentTheme.isDark ? "text-purple-400" : "text-purple-500")} />
+            </div>
+            
+            <h2 className={cn("text-3xl font-bold mb-4", currentTheme.colors.text)}>
+              Intelligence Artificielle Financière
+            </h2>
+            
+            <p className={cn("text-lg mb-8 max-w-2xl mx-auto", currentTheme.colors.subtext)}>
+              Notre IA analyse votre situation financière complète et vous propose des recommandations personnalisées pour optimiser votre patrimoine.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className={cn("p-6 rounded-xl", currentTheme.isDark ? "bg-slate-800/50" : "bg-white/50")}>
+                <Zap className="w-10 h-10 text-purple-500 mx-auto mb-3" />
+                <h3 className={cn("font-bold mb-2", currentTheme.colors.text)}>Analyse Instantanée</h3>
+                <p className={cn("text-sm", currentTheme.colors.subtext)}>Résultats en quelques secondes</p>
+              </div>
+              
+              <div className={cn("p-6 rounded-xl", currentTheme.isDark ? "bg-slate-800/50" : "bg-white/50")}>
+                <Target className="w-10 h-10 text-pink-500 mx-auto mb-3" />
+                <h3 className={cn("font-bold mb-2", currentTheme.colors.text)}>100% Personnalisé</h3>
+                <p className={cn("text-sm", currentTheme.colors.subtext)}>Adapté à votre situation</p>
+              </div>
+              
+              <div className={cn("p-6 rounded-xl", currentTheme.isDark ? "bg-slate-800/50" : "bg-white/50")}>
+                <Trophy className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+                <h3 className={cn("font-bold mb-2", currentTheme.colors.text)}>+50 XP</h3>
+                <p className={cn("text-sm", currentTheme.colors.subtext)}>Gagnez des points à chaque analyse</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Analysis Results */}
+      {analyse && (
+        <div className="space-y-6">
+          {/* Score Card */}
+          <Card className={cn("relative overflow-hidden border-none", currentTheme.isDark ? "bg-slate-800/50" : "bg-white")}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${getScoreGradient(analyse.score)} opacity-5`} />
+            <CardContent className="p-8 text-center relative z-10">
+              <h2 className={cn("text-2xl font-bold mb-4", currentTheme.colors.text)}>Votre Score Financier</h2>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <p className={`text-8xl font-black ${getScoreColor(analyse.score)}`}>
+                  {analyse.score}
+                </p>
+                <span className={cn("text-4xl font-bold", currentTheme.colors.subtext)}>/100</span>
+              </div>
+              <p className={cn("text-lg max-w-2xl mx-auto", currentTheme.colors.subtext)}>
+                {analyse.resume}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Points Forts & Faibles */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className={cn("border-none", currentTheme.isDark ? "bg-emerald-900/20" : "bg-emerald-50")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <CheckCircle className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  Points Forts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {analyse.pointsForts.map((point, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className={currentTheme.colors.text}>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className={cn("border-none", currentTheme.isDark ? "bg-red-900/20" : "bg-red-50")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/10 rounded-lg">
+                    <XCircle className="w-6 h-6 text-red-500" />
+                  </div>
+                  À Améliorer
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {analyse.pointsFaibles.map((point, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                      <span className={currentTheme.colors.text}>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recommandations */}
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-purple-500/10 rounded-xl">
+                <Trophy className="w-7 h-7 text-purple-500" />
+              </div>
+              <h3 className={cn("text-3xl font-bold", currentTheme.colors.text)}>
+                Recommandations Prioritaires
+              </h3>
+            </div>
+            
+            <div className="space-y-4">
+              {analyse.recommandationsPrioritaires.sort((a, b) => a.priorite - b.priorite).map((rec, i) => (
+                <Card key={i} className={cn("group relative overflow-hidden border-none", currentTheme.isDark ? "bg-slate-800/50" : "bg-white")}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <CardContent className="p-6 relative z-10">
+                    <div className="flex items-start gap-4">
+                      <Badge className="bg-purple-600 text-white font-bold text-lg px-3 py-1 flex-shrink-0">
+                        #{rec.priorite}
+                      </Badge>
+                      <div className="flex-1">
+                        <h4 className={cn("font-bold text-xl mb-2", currentTheme.colors.text)}>
+                          {rec.titre}
+                        </h4>
+                        <p className={cn("mb-4", currentTheme.colors.subtext)}>
+                          {rec.description}
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            💰 Économie: {rec.economie}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            ⏱️ Délai: {rec.delai}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Conseils Expert */}
+          <Card className={cn("border-none", currentTheme.isDark ? "bg-amber-900/20" : "bg-amber-50")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/10 rounded-lg">
+                  <Lightbulb className="w-6 h-6 text-amber-500" />
+                </div>
+                Conseils d'Expert
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {analyse.conseilsExpert.map((conseil, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="mt-1 w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                    <span className={currentTheme.colors.text}>{conseil}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Optimisation Fiscale */}
+          <Card className={cn("border-none", currentTheme.isDark ? "bg-cyan-900/20" : "bg-cyan-50")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/10 rounded-lg">
+                  <AlertTriangle className="w-6 h-6 text-cyan-500" />
+                </div>
+                Optimisation Fiscale
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className={cn("leading-relaxed", currentTheme.colors.text)}>
+                {analyse.optimisationFiscale}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // FILE: app/(main)/budgets/page.tsx
 // ============================================================================
 
@@ -846,6 +1300,8 @@ export default function BudgetsPage() {
 // FILE: app/(main)/dashboard/page.tsx
 // ============================================================================
 
+// app/(main)/dashboard/page.tsx
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -856,13 +1312,12 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Wallet, Target, Flame, Star, Trophy, 
-  Sparkles, ChevronRight, PiggyBank, AlertTriangle, AlertCircle, 
+  Sparkles, PiggyBank, AlertTriangle, AlertCircle, 
   FileDown, Lock 
 } from 'lucide-react';
 
 import { formaterMontant, calculerMontantMensuel } from '@/utils/financeCalculations';
 import { CATEGORIES } from '@/constants';
-import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -870,6 +1325,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useFinanceData } from '@/context/FinanceDataContext';
+import { AiInsightsCard } from '@/components/dashboard/ai-insights-card'; // IMPORT THIS
 
 interface StatCardProps {
   label: string;
@@ -916,8 +1372,6 @@ export default function DashboardPage() {
     objectifs,
     actifs,
     tropheesDeverrouilles,
-    analyserAvecIA,
-    chargementIA,
     budgets,
     setBudgets,
     gameState
@@ -1076,51 +1530,63 @@ export default function DashboardPage() {
         <StatCard label="Objectifs" value={objectifs.length.toString()} icon={Target} gradient="from-purple-500 to-pink-500" bg="from-purple-50 to-pink-50" count="En cours" />
       </div>
 
-      {/* Charts Section */}
-      {(depenses.length > 0 || revenus.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Répartition</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {donneesParCategorie.length > 0 ? (
+      {/* AI & Charts Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* The New AI Insights Card */}
+        <AiInsightsCard />
+
+        {/* Charts Section */}
+        {(depenses.length > 0 || revenus.length > 0) ? (
+          <div className="space-y-6">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Répartition des dépenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {donneesParCategorie.length > 0 ? (
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={donneesParCategorie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {donneesParCategorie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [formaterMontant(value), "Montant"]} contentStyle={tooltipStyle} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : <div className="h-[250px] flex items-center justify-center text-slate-400">Aucune donnée</div>}
+              </CardContent>
+            </Card>
+
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Aperçu Mensuel</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={donneesParCategorie} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                        {donneesParCategorie.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />)}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => [formaterMontant(value), "Montant"]} contentStyle={tooltipStyle} />
-                    </PieChart>
+                    <BarChart data={donneesRevenuDepenses} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
+                      <XAxis dataKey="categorie" stroke={currentTheme.colors.chartText} tick={{fontSize: 12}} axisLine={false} tickLine={false} />
+                      <YAxis stroke={currentTheme.colors.chartText} tickFormatter={(value) => `${value}€`} tick={{fontSize: 12}} axisLine={false} tickLine={false}/>
+                      <Tooltip formatter={(value: number) => formaterMontant(value)} cursor={{fill: currentTheme.isDark ? '#1e293b' : '#f8fafc'}} contentStyle={tooltipStyle} />
+                      <Bar dataKey="montant" radius={[6, 6, 0, 0]}>
+                        {donneesRevenuDepenses.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
-              ) : <div className="h-[250px] flex items-center justify-center text-slate-400">Aucune donnée</div>}
-            </CardContent>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="flex items-center justify-center min-h-[300px]">
+             <div className="text-center text-muted-foreground">
+                Add transactions to see charts.
+             </div>
           </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Aperçu Mensuel</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={donneesRevenuDepenses} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={currentTheme.isDark ? "#334155" : "#f1f5f9"} vertical={false} />
-                    <XAxis dataKey="categorie" stroke={currentTheme.colors.chartText} tick={{fontSize: 12}} axisLine={false} tickLine={false} />
-                    <YAxis stroke={currentTheme.colors.chartText} tickFormatter={(value) => `${value}€`} tick={{fontSize: 12}} axisLine={false} tickLine={false}/>
-                    <Tooltip formatter={(value: number) => formaterMontant(value)} cursor={{fill: currentTheme.isDark ? '#1e293b' : '#f8fafc'}} contentStyle={tooltipStyle} />
-                    <Bar dataKey="montant" radius={[6, 6, 0, 0]}>
-                      {donneesRevenuDepenses.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Advanced Charts (Unlockable) */}
       <Card className="relative overflow-hidden">
@@ -1249,26 +1715,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* AI Action Button */}
-      <Button 
-        onClick={analyserAvecIA} 
-        disabled={chargementIA} 
-        className="w-full h-16 text-lg rounded-2xl shadow-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:scale-[1.01] transition-transform"
-      >
-        {chargementIA ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div> 
-            Analyse en cours...
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-5 h-5 mr-2" /> 
-            Lancer l&apos;analyse IA 
-            <ChevronRight className="w-5 h-5 ml-2" />
-          </>
-        )}
-      </Button>
     </div>
   );
 }
@@ -2222,8 +2668,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { HeaderMain } from "@/components/layout/header-main";
-import { FinanceDataProvider } from '@/context/FinanceDataContext';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { FinanceDataProvider } from "@/context/FinanceDataContext"; // Ensure this path is correct
+import { ThemeProvider } from "@/context/ThemeContext";
 
 export default async function MainLayout({
   children,
@@ -2238,6 +2684,7 @@ export default async function MainLayout({
 
   return (
     <ThemeProvider>
+      {/* FinanceDataProvider must wrap SidebarProvider to allow Sidebar to access financial data (e.g. XP/Level) */}
       <FinanceDataProvider>
         <SidebarProvider>
           <div className="flex min-h-screen w-full">
@@ -2245,7 +2692,9 @@ export default async function MainLayout({
             <SidebarRail />
             <SidebarInset>
               <HeaderMain user={session.user} />
-              <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
+              <main className="flex-1 p-4 sm:px-6 sm:py-0 mt-4">
+                {children}
+              </main>
             </SidebarInset>
           </div>
         </SidebarProvider>
@@ -3322,6 +3771,245 @@ export default function TransactionsPage() {
 }
 
 // ============================================================================
+// FILE: app/api/analyse-ia/route.ts
+// ============================================================================
+
+import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
+
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+
+// Response schema for structured output
+const responseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    score: {
+      type: SchemaType.NUMBER,
+      description: "Score de santé financière entre 0 et 100"
+    },
+    resume: {
+      type: SchemaType.STRING,
+      description: "Résumé de la situation en 2-3 phrases"
+    },
+    pointsForts: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "Liste de 3-4 points forts"
+    },
+    pointsFaibles: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "Liste de 3-4 points faibles"
+    },
+    recommandationsPrioritaires: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          priorite: { type: SchemaType.NUMBER },
+          titre: { type: SchemaType.STRING },
+          description: { type: SchemaType.STRING },
+          economie: { type: SchemaType.STRING },
+          delai: { type: SchemaType.STRING }
+        },
+        required: ["priorite", "titre", "description", "economie", "delai"]
+      }
+    },
+    conseilsExpert: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+      description: "5-6 conseils pratiques"
+    },
+    optimisationFiscale: {
+      type: SchemaType.STRING,
+      description: "Conseils fiscaux spécifiques à la France"
+    },
+    analyseSimulations: {
+      type: SchemaType.OBJECT,
+      properties: {
+        retraite: { type: SchemaType.STRING },
+        immobilier: { type: SchemaType.STRING },
+        projet: { type: SchemaType.STRING }
+      },
+      description: "Analyses spécifiques des simulations si fournies"
+    }
+  },
+  required: ["score", "resume", "pointsForts", "pointsFaibles", "recommandationsPrioritaires", "conseilsExpert", "optimisationFiscale"]
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json()
+
+    // Vérifier que les données sont présentes
+    if (!data.revenus || !data.depenses) {
+      return NextResponse.json(
+        { error: 'Données financières manquantes' },
+        { status: 400 }
+      )
+    }
+
+    // Construire le prompt système
+    const systemPrompt = `Tu es un expert financier certifié spécialisé dans la gestion de patrimoine en France. 
+Tu dois analyser la situation financière d'un utilisateur et fournir des recommandations personnalisées.
+
+Contexte fiscal français:
+- TMI (Taux Marginal d'Imposition): 0%, 11%, 30%, 41%, 45%
+- Dispositifs d'épargne: Livret A (3%), LDDS, LEP (6% si éligible), PEL
+- Investissements défiscalisés: PER (déduction jusqu'à 10% revenus), PEA (exonération après 5 ans), Assurance Vie
+- Règle du 50/30/20: 50% besoins, 30% envies, 20% épargne
+- Taux d'endettement maximal: 35% (HCSF)
+- Règle des 4% pour la retraite: Retrait annuel sécurisé de 4% du capital
+
+Ton analyse doit:
+1. Calculer un score de santé financière (0-100) basé sur:
+   - Ratio dépenses/revenus (< 70% = bon)
+   - Cash flow positif
+   - Diversification des revenus et actifs
+   - Présence d'un fonds d'urgence (3-6 mois de dépenses)
+   - Projections futures cohérentes
+
+2. Identifier les forces et faiblesses
+
+3. Proposer 3-5 recommandations CONCRÈTES et CHIFFRÉES par priorité:
+   - Réduction de dépenses inutiles (abonnements, frais bancaires)
+   - Remboursement anticipé de dettes (méthode Avalanche: taux le plus élevé d'abord)
+   - Optimisation de l'épargne et des investissements
+   - Conseils fiscaux adaptés (PER, PEA, dons, etc.)
+   - Arbitrages entre projets selon urgence et rentabilité
+
+4. Donner 5-6 conseils d'expert pratiques et actionnables
+
+5. Proposer une stratégie d'optimisation fiscale chiffrée`
+
+    // Construire le prompt utilisateur avec les données
+    let userPrompt = `Analyse la situation financière suivante:
+
+REVENUS MENSUELS: ${data.revenus.total}€
+Sources: ${JSON.stringify(data.revenus.sources, null, 2)}
+
+DÉPENSES MENSUELLES: ${data.depenses.total}€
+Détail: ${JSON.stringify(data.depenses.detail, null, 2)}
+
+PATRIMOINE NET: ${data.patrimoine.net}€
+Actifs: ${JSON.stringify(data.patrimoine.actifs, null, 2)}
+Passifs: ${JSON.stringify(data.patrimoine.passifs, null, 2)}
+
+CASH FLOW: ${data.cashFlow}€/mois
+
+MÉTRIQUES:
+- Ratio Dépenses/Revenus: ${data.metriques.ratioDepensesRevenus.toFixed(1)}%
+- Taux d'Épargne: ${data.metriques.tauxEpargne.toFixed(1)}%`
+
+    // Ajouter les simulations si présentes
+    if (data.simulations) {
+      userPrompt += `
+
+SIMULATIONS ET PROJECTIONS:
+
+`
+      if (data.simulations.retraite) {
+        const r = data.simulations.retraite
+        userPrompt += `RETRAITE:
+- Âge actuel: ${r.ageActuel} ans
+- Âge de départ: ${r.ageRetraite} ans
+- Capital actuel: ${r.capitalActuel}€
+- Épargne mensuelle: ${r.epargneMensuelle}€
+- Rendement espéré: ${r.rendement}%
+- Inflation anticipée: ${r.inflation}%
+- Projection capital à la retraite: ${r.projectionCapital}€ (nominal)
+- Projection pouvoir d'achat réel: ${r.projectionReel}€
+- Rente mensuelle estimée (4%): ${r.renteMensuelle}€
+
+`
+      }
+
+      if (data.simulations.immobilier) {
+        const i = data.simulations.immobilier
+        userPrompt += `PROJET IMMOBILIER:
+- Prix du bien: ${i.prixBien}€
+- Apport: ${i.apport}€
+- Montant emprunté: ${i.montantEmprunt}€
+- Durée: ${i.dureeAnnees} ans
+- Taux: ${i.taux}%
+- Mensualité: ${i.mensualite}€
+- Coût total intérêts: ${i.coutInterets}€
+- Revenus mensuels: ${i.revenusMensuels}€
+- Taux d'endettement: ${i.tauxEndettement}%
+- ALERTE: ${i.tauxEndettement > 35 ? '⚠️ Dépassement du seuil de 35%' : 'Taux acceptable'}
+
+`
+      }
+
+      if (data.simulations.projet) {
+        const p = data.simulations.projet
+        userPrompt += `PROJET DE VIE: ${p.nom}
+- Montant cible: ${p.montant}€
+- Délai: ${p.delaiMois} mois
+- Épargne actuelle: ${p.epargneActuelle}€
+- Reste à financer: ${p.resteAFinancer}€
+- Profil de risque: ${p.profil}
+- Épargne mensuelle nécessaire (sans intérêts): ${p.mensualiteBrute}€
+- Épargne mensuelle optimisée (avec placement): ${p.mensualiteOptimisee}€
+- Gain via placement: ${p.gainInterets}€
+
+`
+      }
+
+      userPrompt += `ANALYSE DEMANDÉE:
+1. Évalue la cohérence globale des projets par rapport aux capacités financières
+2. Identifie les arbitrages nécessaires entre court, moyen et long terme
+3. Signale les risques (endettement excessif, épargne insuffisante, projections irréalistes)
+4. Propose des optimisations concrètes pour chaque simulation
+5. Fournis des recommandations pour équilibrer tous les objectifs
+
+`
+    }
+
+    userPrompt += `
+Fournis une analyse complète et des recommandations actionnables selon le schéma JSON requis.`
+
+    // Appeler Gemini avec structured output
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+        temperature: 0.7,
+      },
+    })
+
+    const result = await model.generateContent([
+      { text: systemPrompt },
+      { text: userPrompt }
+    ])
+
+    const response = result.response
+    const text = response.text()
+    
+    // Parser la réponse JSON
+    const analyse = JSON.parse(text)
+
+    // Ajouter la date d'analyse
+    analyse.dateAnalyse = new Date().toISOString()
+
+    return NextResponse.json(analyse)
+
+  } catch (error) {
+    console.error('Erreur analyse IA:', error)
+    
+    return NextResponse.json(
+      {
+        error: 'Erreur lors de l\'analyse',
+        message: error instanceof Error ? error.message : 'Erreur inconnue'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// ============================================================================
 // FILE: app/api/auth/[...nextauth]/route.ts
 // ============================================================================
 
@@ -3455,7 +4143,6 @@ export async function POST(request: Request) {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   
-  /* 1. Set Roobert as the default sans font, fallback to Geist */
   --font-sans: var(--font-roobert), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   
@@ -3496,12 +4183,11 @@ export async function POST(request: Request) {
 }
 
 :root {
-  /* 2. Refined Radii for a modern feel */
   --radius: 0.75rem;
 
-  /* LIGHT MODE - Crisp, Clean Zinc/Indigo Palette */
+  /* LIGHT MODE */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.13 0.028 261.692); /* Zinc 950 */
+  --foreground: oklch(0.13 0.028 261.692);
   
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.13 0.028 261.692);
@@ -3509,15 +4195,14 @@ export async function POST(request: Request) {
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0.028 261.692);
   
-  /* Primary: Vibrant Indigo */
   --primary: oklch(0.491 0.27 277.037);
   --primary-foreground: oklch(0.985 0 0);
   
-  --secondary: oklch(0.967 0.003 264.542); /* Zinc 100 */
-  --secondary-foreground: oklch(0.21 0.034 264.665); /* Zinc 800 */
+  --secondary: oklch(0.967 0.003 264.542);
+  --secondary-foreground: oklch(0.21 0.034 264.665);
   
   --muted: oklch(0.967 0.003 264.542);
-  --muted-foreground: oklch(0.552 0.016 285.938); /* Zinc 500 */
+  --muted-foreground: oklch(0.552 0.016 285.938);
   
   --accent: oklch(0.967 0.003 264.542);
   --accent-foreground: oklch(0.21 0.034 264.665);
@@ -3525,19 +4210,12 @@ export async function POST(request: Request) {
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.92 0.004 286.32); /* Zinc 200 */
+  --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.491 0.27 277.037); /* Matches Primary */
+  --ring: oklch(0.491 0.27 277.037);
 
-  /* Charts */
-  --chart-1: oklch(0.491 0.27 277.037); /* Indigo */
-  --chart-2: oklch(0.696 0.17 162.48);  /* Teal */
-  --chart-3: oklch(0.769 0.188 70.08);  /* Orange */
-  --chart-4: oklch(0.627 0.265 303.9);  /* Pink */
-  --chart-5: oklch(0.645 0.246 16.439); /* Red */
-
-  /* Sidebar Light */
-  --sidebar: oklch(0.984 0.003 247.858); /* Zinc 50 */
+  /* Sidebar */
+  --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.32 0.03 260);
   --sidebar-primary: oklch(0.491 0.27 277.037);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -3545,20 +4223,25 @@ export async function POST(request: Request) {
   --sidebar-accent-foreground: oklch(0.21 0.034 264.665);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.491 0.27 277.037);
+  
+  --chart-1: oklch(0.491 0.27 277.037);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
 }
 
 .dark {
-  /* DARK MODE - Deep Blue-Grey/Zinc Palette */
-  --background: oklch(0.12 0.01 260); /* Deep rich grey */
+  /* DARK MODE */
+  --background: oklch(0.12 0.01 260);
   --foreground: oklch(0.985 0 0);
   
-  --card: oklch(0.15 0.01 260); /* Slightly lighter than bg */
+  --card: oklch(0.15 0.01 260);
   --card-foreground: oklch(0.985 0 0);
   
   --popover: oklch(0.15 0.01 260);
   --popover-foreground: oklch(0.985 0 0);
   
-  /* Primary: Lighter Indigo for Dark Mode contrast */
   --primary: oklch(0.65 0.25 277);
   --primary-foreground: oklch(0.12 0.01 260);
   
@@ -3578,14 +4261,6 @@ export async function POST(request: Request) {
   --input: oklch(0.25 0.01 260);
   --ring: oklch(0.55 0.25 277);
 
-  /* Charts */
-  --chart-1: oklch(0.65 0.25 277);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-
-  /* Sidebar Dark */
   --sidebar: oklch(0.11 0.01 260);
   --sidebar-foreground: oklch(0.92 0 0);
   --sidebar-primary: oklch(0.65 0.25 277);
@@ -3594,6 +4269,12 @@ export async function POST(request: Request) {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.25 0.01 260);
   --sidebar-ring: oklch(0.55 0.25 277);
+  
+  --chart-1: oklch(0.65 0.25 277);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
 }
 
 @layer base {
@@ -3605,7 +4286,8 @@ export async function POST(request: Request) {
   }
 }
 
-/* 3. Improved Animations */
+/* --- Utilities --- */
+
 @keyframes appear-up {
   from {
     opacity: 0;
@@ -3620,10 +4302,9 @@ export async function POST(request: Request) {
 }
 
 .animate-appear {
-  animation: appear-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: appear-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-/* Gradient Background Animation */
 @keyframes gradient-move {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -3631,18 +4312,27 @@ export async function POST(request: Request) {
 }
 
 .animated-gradient {
-  background: linear-gradient(-45deg, #6366f1, #d946ef, #0ea5e9, #10b981);
-  background-size: 300% 300%;
-  animation: gradient-move 10s ease infinite;
+  background: linear-gradient(-45deg, #4f46e5, #be185d, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
 }
 
-/* 4. Glassmorphism Utility */
-.glass {
-  @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg;
+
+
+/* Animations personnalisées */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(5deg);
+  }
 }
-.dark .glass {
-  @apply bg-black/10 border-white/10;
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
+
 
 // ============================================================================
 // FILE: app/layout.tsx
@@ -3753,7 +4443,6 @@ export default function RootLayout({
 // FILE: app/page.tsx
 // ============================================================================
 
-// app/page.tsx
 import { Header } from "@/components/layout/header";
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
@@ -3776,29 +4465,14 @@ export default function LandingPage() {
           ctaText="Get Started for Free"
           ctaLink="/register"
           mockupImage={{
-            src: "/dashboard-mockup.png", // NOTE: Add a placeholder image to your `public` folder
-            alt: "Finances Expert Pro Dashboard Mockup",
+            src: "/dashboard.png",
+            alt: "Finances Expert Pro Dashboard",
             width: 1440,
             height: 900,
           }}
         />
         <Features />
         <Pricing />
-
-        {/* About section */}
-        <section id="about" className="w-full py-24 sm:py-32">
-          <div className="container">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold">About Finances Expert Pro</h2>
-              <p className="text-muted-foreground mt-4 max-w-3xl mx-auto">
-                This application provides users with a comprehensive and
-                intelligent platform to manage every aspect of their financial
-                lives, from daily transaction tracking to long-term investment
-                and goal planning.
-              </p>
-            </div>
-          </div>
-        </section>
       </main>
       <Footer />
     </div>
@@ -3927,97 +4601,103 @@ export function AddBudgetDialog() {
 // FILE: components/dashboard/ai-insights-card.tsx
 // ============================================================================
 
-// components/dashboard/ai-insights-card.tsx
+"use client"
 
-"use client";
-
-import { useState } from "react";
-import { Sparkles, Loader2, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { generateFinancialInsights } from "@/lib/actions/ai.actions";
-
-// Define the expected type
-type InsightsData = {
-  score: number;
-  summary: string;
-  recommendations?: string[]; // Make optional
-};
+import React from 'react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+  Brain, 
+  Sparkles, 
+  TrendingUp, 
+  TrendingDown, 
+  CheckCircle,
+  XCircle,
+  Trophy,
+  ArrowRight,
+  Zap
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useTheme } from '@/context/ThemeContext'
 
 export function AiInsightsCard() {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<InsightsData | null>(null);
+  const { currentTheme } = useTheme()
+  const router = useRouter()
 
-  const handleGenerate = async () => {
-    setLoading(true);
-    try {
-      const result = await generateFinancialInsights();
-      if (result.error) {
-        // Handle error gracefully (could use toast here)
-        console.error(result.error);
-        return;
-      }
-      setData(result);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Redirection vers la page d'analyse avec auto-start
+  const handleLaunchAnalysis = () => {
+    router.push('/analyse-ia?autostart=true')
+  }
 
   return (
-    <Card className="border-indigo-500/20 bg-indigo-50/10 dark:bg-indigo-950/10">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-           <Sparkles className="h-5 w-5 text-indigo-500" />
-           <CardTitle>AI Financial Analyst</CardTitle>
-        </div>
-        <CardDescription>Get personalized insights powered by Gemini.</CardDescription>
+    <Card className={cn(
+      "relative overflow-hidden border-none bg-gradient-to-br",
+      currentTheme.isDark 
+        ? "from-purple-900/20 via-pink-900/20 to-blue-900/20" 
+        : "from-purple-50 via-pink-50 to-blue-50"
+    )}>
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-white/10 pointer-events-none" />
+      
+      <CardHeader className="relative z-10">
+        <CardTitle className="flex items-center gap-3">
+          <div className={cn(
+            "p-3 rounded-xl shadow-lg",
+            currentTheme.isDark 
+              ? "bg-gradient-to-br from-purple-600 to-pink-600" 
+              : "bg-gradient-to-br from-purple-500 to-pink-500"
+          )}>
+            <Brain className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <div className={cn("text-lg font-bold", currentTheme.colors.text)}>
+              Analyse IA
+            </div>
+            <div className={cn("text-sm font-normal", currentTheme.colors.subtext)}>
+              Insights personnalisés
+            </div>
+          </div>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            <p className="text-sm text-muted-foreground">Analyzing your transactions...</p>
+
+      <CardContent className="relative z-10 space-y-6">
+        <div className={cn("text-center py-8", currentTheme.colors.subtext)}>
+          <div className="inline-flex p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-3xl mb-4">
+            <Sparkles className={cn("w-16 h-16", currentTheme.isDark ? "text-purple-400" : "text-purple-500")} />
           </div>
-        ) : data ? (
-          <div className="space-y-4">
-             <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border">
-                <span className="text-sm font-medium">Financial Health Score</span>
-                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{data.score ?? 0}/100</span>
-             </div>
-             <p className="text-sm">{data.summary}</p>
-             <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Recommendations</p>
-                <ul className="text-sm space-y-1 list-disc pl-4">
-                    {/* SAFE GUARD: Check if recommendations exists before mapping */}
-                    {data.recommendations && data.recommendations.length > 0 ? (
-                        data.recommendations.map((rec, i) => (
-                            <li key={i}>{rec}</li>
-                        ))
-                    ) : (
-                        <li>No specific recommendations available.</li>
-                    )}
-                </ul>
-             </div>
-          </div>
-        ) : (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            Tap the button below to generate a real-time analysis of your finances.
-          </div>
-        )}
-      </CardContent>
-      <CardFooter>
+          <p className="text-sm mb-6 max-w-xs mx-auto">
+            Obtenez une analyse complète de votre situation financière avec des recommandations personnalisées
+          </p>
+        </div>
+
         <Button 
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" 
-            onClick={handleGenerate} 
-            disabled={loading}
+          onClick={handleLaunchAnalysis}
+          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
+          size="lg"
         >
-            {data ? <><RefreshCw className="mr-2 h-4 w-4"/> Refresh Analysis</> : "Generate Insights"}
+          <Sparkles className="w-5 h-5 mr-2" />
+          Lancer l'Analyse IA
+          <ArrowRight className="w-5 h-5 ml-2" />
         </Button>
-      </CardFooter>
+
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-2">
+          <div className="flex items-center gap-1">
+            <Zap className="w-3 h-3 text-purple-500" />
+            <span>Instantané</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 text-emerald-500" />
+            <span>Personnalisé</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Trophy className="w-3 h-3 text-amber-500" />
+            <span>+50 XP</span>
+          </div>
+        </div>
+      </CardContent>
     </Card>
-  );
+  )
 }
 
 // ============================================================================
@@ -4188,6 +4868,120 @@ export function MonthlySummaryChart({ data }: MonthlySummaryChartProps) {
       </ResponsiveContainer>
     </ChartContainer>
   );
+}
+
+// ============================================================================
+// FILE: components/dashboard/score-widget.tsx
+// ============================================================================
+
+"use client"
+
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Brain, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react'
+import Link from 'next/link'
+import type { AnalyseIA } from '@/types/analyse'
+
+interface ScoreWidgetProps {
+  analyse: AnalyseIA | null
+  onAnalyse?: () => void
+  showButton?: boolean
+}
+
+export function ScoreWidget({ analyse, onAnalyse, showButton = true }: ScoreWidgetProps) {
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-500'
+    if (score >= 50) return 'text-amber-500'
+    return 'text-red-500'
+  }
+
+  const getScoreTrend = (score: number) => {
+    if (score >= 80) return { icon: TrendingUp, color: 'text-emerald-500', text: 'Excellent' }
+    if (score >= 50) return { icon: TrendingUp, color: 'text-amber-500', text: 'Good' }
+    return { icon: TrendingDown, color: 'text-red-500', text: 'Needs Attention' }
+  }
+
+  if (!analyse) {
+    return (
+      <Card className="bg-gradient-to-br from-primary/10 to-pink-500/10 backdrop-blur-xl border-primary/20 hover:border-primary/40 transition-all group cursor-pointer">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-primary/20 rounded-xl group-hover:scale-110 transition-transform">
+                <Brain className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground text-lg">AI Analysis</h3>
+                <p className="text-sm text-muted-foreground">Not available yet</p>
+              </div>
+            </div>
+          </div>
+          
+          {showButton && (
+            <Button 
+              onClick={onAnalyse}
+              size="sm"
+              className="w-full bg-gradient-to-r from-primary to-pink-600 hover:shadow-lg hover:scale-105 transition-all"
+            >
+              Launch Analysis
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const trend = getScoreTrend(analyse.score)
+
+  return (
+    <Link href="/dashboard/analyse">
+      <Card className="bg-gradient-to-br from-background/50 to-primary/5 backdrop-blur-xl border-border/50 hover:border-primary/50 transition-all hover:-translate-y-1 group cursor-pointer overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <CardContent className="p-6 relative z-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-primary/20 rounded-xl group-hover:scale-110 transition-transform">
+                <Brain className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground text-lg">Financial Score</h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <trend.icon className={`w-4 h-4 ${trend.color}`} />
+                  <span className={trend.color}>{trend.text}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <p className={`text-5xl font-black ${getScoreColor(analyse.score)}`}>
+                {analyse.score}
+              </p>
+              <p className="text-sm text-muted-foreground">/100</p>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border/50">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Strengths</p>
+              <p className="font-bold text-emerald-500">{analyse.pointsForts.length}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">To Improve</p>
+              <p className="font-bold text-amber-500">{analyse.pointsFaibles.length}</p>
+            </div>
+          </div>
+
+          {/* View Details Link */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+            <span className="text-sm text-muted-foreground">View full analysis</span>
+            <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-1 transition-transform" />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
 }
 
 // ============================================================================
@@ -4511,27 +5305,46 @@ export function SeasonPassCard({ gameState }: SeasonPassCardProps) {
 // FILE: components/global/ThemeToggle.tsx
 // ============================================================================
 
-// components/global/ThemeToggle.tsx
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Laptop } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { setTheme } = useTheme();
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-    >
-      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Changer le thème</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          Clair
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          Sombre
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          <Laptop className="mr-2 h-4 w-4" />
+          Système
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -4932,62 +5745,170 @@ export function InvestmentsTable({ investments }: { investments: Investment[] })
 // FILE: components/landing/features.tsx
 // ============================================================================
 
-// components/landing/features.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, BarChart, Trophy, Bot } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Brain, TrendingUp, Shield, Zap, Target, Eye, Star, ArrowRight, BarChart, Smartphone, Globe } from "lucide-react"
 
 const featureList = [
-    { icon: <DollarSign className="w-8 h-8 text-primary" />, title: "Transaction Management", description: "Log income and expenses with ease. Categorize, sort, and filter to understand your spending habits." },
-    { icon: <BarChart className="w-8 h-8 text-primary" />, title: "Financial Planning", description: "Create and track financial goals. Set budgets for spending categories and monitor your progress in real-time." },
-    { icon: <Trophy className="w-8 h-8 text-primary" />, title: "Gamification", description: "Earn XP and level up by managing your finances. Unlock new features and themes as you go." },
-    { icon: <Bot className="w-8 h-8 text-primary" />, title: "AI-Powered Insights", description: "Get a detailed analysis of your financial health with actionable recommendations from our integrated AI." },
+  {
+    icon: Brain,
+    title: "AI-Powered Insights",
+    description: "Get personalized financial recommendations powered by advanced AI that learns from your spending patterns and helps you make smarter decisions.",
+    gradient: "from-purple-500 to-pink-500",
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10",
+  },
+  {
+    icon: TrendingUp,
+    title: "Smart Investment Tracking",
+    description: "Monitor your portfolio performance in real-time with comprehensive analytics and forecasting tools to maximize your returns.",
+    gradient: "from-blue-500 to-cyan-500",
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/10",
+  },
+  {
+    icon: Shield,
+    title: "Bank-Level Security",
+    description: "Your data is protected with enterprise-grade encryption, multi-factor authentication, and compliance with industry standards.",
+    gradient: "from-green-500 to-emerald-500",
+    color: "text-green-400",
+    bgColor: "bg-green-500/10",
+  },
+  {
+    icon: Zap,
+    title: "Real-Time Sync",
+    description: "Automatically sync with 15,000+ financial institutions worldwide. Your data updates instantly, 24/7.",
+    gradient: "from-yellow-500 to-orange-500",
+    color: "text-yellow-400",
+    bgColor: "bg-yellow-500/10",
+  },
+  {
+    icon: Target,
+    title: "Goal Planning",
+    description: "Set financial goals and let our AI create personalized action plans. Track progress and achieve your dreams faster.",
+    gradient: "from-red-500 to-pink-500",
+    color: "text-red-400",
+    bgColor: "bg-red-500/10",
+  },
+  {
+    icon: Eye,
+    title: "360° Dashboard",
+    description: "Get a complete view of your financial life with interactive visualizations, real-time charts, and future projections.",
+    gradient: "from-indigo-500 to-purple-500",
+    color: "text-indigo-400",
+    bgColor: "bg-indigo-500/10",
+  },
+  {
+    icon: BarChart,
+    title: "Advanced Analytics",
+    description: "Deep dive into your spending patterns with detailed reports and insights to optimize every dollar you spend.",
+    gradient: "from-pink-500 to-rose-500",
+    color: "text-pink-400",
+    bgColor: "bg-pink-500/10",
+  },
+  {
+    icon: Smartphone,
+    title: "Cross-Platform",
+    description: "Access your finances anywhere with native iOS and Android apps plus a responsive web interface.",
+    gradient: "from-cyan-500 to-blue-500",
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10",
+  },
+  {
+    icon: Globe,
+    title: "Multi-Currency",
+    description: "Manage accounts in 150+ currencies with real-time conversion. Perfect for international finances and crypto.",
+    gradient: "from-violet-500 to-purple-500",
+    color: "text-violet-400",
+    bgColor: "bg-violet-500/10",
+  },
 ]
 
 export function Features() {
   return (
-    <section id="features" className="w-full py-24 sm:py-32">
-        <div className="container">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything You Need to Succeed</h2>
-                <p className="mt-4 text-lg text-muted-foreground">
-                    All the tools to take control of your financial future, in one place.
-                </p>
-            </div>
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
-                {featureList.map(feature => (
-                     <Card key={feature.title} className="text-center">
-                        <CardHeader>
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-                               {feature.icon}
-                            </div>
-                            <CardTitle>{feature.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground">{feature.description}</p>
-                        </CardContent>
-                     </Card>
-                ))}
-            </div>
+    <section id="features" className="w-full py-24 sm:py-32 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      
+      <div className="container mx-auto max-w-7xl relative z-10 px-6">
+        <div className="text-center mb-20 space-y-6">
+          <div className="flex justify-center">
+            <Badge className="bg-primary/10 border-primary/20 text-primary px-6 py-2.5 text-sm font-medium hover:bg-primary/20 transition-all cursor-default">
+              <Star className="w-4 h-4 mr-2" />
+              Features
+            </Badge>
+          </div>
+          
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight text-center mx-auto max-w-4xl">
+            <span className="bg-gradient-to-r from-primary via-pink-500 to-primary bg-clip-text text-transparent">
+              Everything You Need
+            </span>
+            <br />
+            <span className="text-foreground mt-2 inline-block">
+              to Master Your Finances
+            </span>
+          </h2>
+          
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed text-center">
+            Powerful features designed to give you complete control over your financial future
+          </p>
         </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
+          {featureList.map((feature) => (
+            <Card 
+              key={feature.title} 
+              className="group relative bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/20 overflow-hidden"
+            >
+              <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              
+              <CardHeader className="relative z-10">
+                <div className={`inline-flex w-fit p-4 mb-4 rounded-2xl ${feature.bgColor} group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <div className="relative">
+                    <feature.icon className={`w-8 h-8 ${feature.color} relative z-10`} />
+                    <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} blur-xl opacity-50 group-hover:opacity-75 transition-opacity`} />
+                  </div>
+                </div>
+                
+                <CardTitle className="text-2xl text-foreground group-hover:text-primary transition-colors">
+                  {feature.title}
+                </CardTitle>
+              </CardHeader>
+              
+              <CardContent className="relative z-10">
+                <p className="text-muted-foreground leading-relaxed mb-6">
+                  {feature.description}
+                </p>
+                
+                <div className="flex items-center text-primary font-semibold group-hover:translate-x-2 transition-transform duration-300">
+                  <span className="text-sm">Learn more</span>
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     </section>
-  );
+  )
 }
 
 // ============================================================================
 // FILE: components/landing/hero.tsx
 // ============================================================================
 
-// components/landing/hero.tsx
 "use client"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
-import { Mockup, MockupFrame } from "@/components/ui/mockup"
-import { ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { ChevronRight, Rocket, Sparkles, Users, Wallet, Zap, Star, TrendingUp, Shield, Target } from "lucide-react"
 
-interface HeroProps extends React.HTMLAttributes<HTMLDivElement> {
+interface HeroProps {
   title: React.ReactNode
   subtitle?: string
   eyebrow?: string
@@ -5001,129 +5922,246 @@ interface HeroProps extends React.HTMLAttributes<HTMLDivElement> {
   }
 }
 
-const Hero = React.forwardRef<HTMLDivElement, HeroProps>(
-  ({ className, title, subtitle, eyebrow, ctaText, ctaLink, mockupImage, ...props }, ref) => {
-    return (
-      <section
-        ref={ref}
-        className={cn("flex flex-col items-center bg-secondary/30", className)}
-        {...props}
-      >
-        <div className="container text-center pt-20 pb-16">
-            {eyebrow && (
-            <p 
-                className="font-instrument-sans uppercase tracking-[0.51em] leading-[133%] text-center text-sm md:text-base mb-8 text-foreground animate-appear opacity-0"
-            >
-                {eyebrow}
-            </p>
-            )}
+const stats = [
+  { value: "2M+", label: "Active Users", icon: Users },
+  { value: "$15B", label: "Assets Managed", icon: Wallet },
+  { value: "99.9%", label: "Uptime", icon: Zap },
+  { value: "4.9★", label: "Average Rating", icon: Star },
+]
 
-            <h1 
-            className="text-4xl md:text-6xl font-semibold leading-tight text-center text-foreground animate-appear opacity-0 [animation-delay:100ms]"
-            >
-            {title}
-            </h1>
+const floatingIcons = [
+  { Icon: TrendingUp, color: "text-green-400", delay: "0s", position: "top-20 left-10" },
+  { Icon: Shield, color: "text-blue-400", delay: "0.5s", position: "top-40 right-20" },
+  { Icon: Target, color: "text-purple-400", delay: "1s", position: "bottom-40 left-20" },
+  { Icon: Sparkles, color: "text-pink-400", delay: "1.5s", position: "bottom-20 right-10" },
+]
 
-            {subtitle && (
-            <p 
-                className="text-lg md:text-xl max-w-3xl mx-auto text-center font-instrument-sans font-light mt-6 mb-8 leading-relaxed text-muted-foreground animate-appear opacity-0 [animation-delay:300ms]"
-            >
-                {subtitle}
-            </p>
-            )}
+export function Hero({ 
+  title, 
+  subtitle, 
+  eyebrow, 
+  ctaText = "Get Started", 
+  ctaLink = "/register",
+  mockupImage 
+}: HeroProps) {
+  const [mousePosition, setMousePosition] = React.useState({ x: 0, y: 0 })
 
-            {ctaText && ctaLink && (
-            <Link href={ctaLink}>
-                <div 
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 h-12 text-lg font-medium text-primary-foreground transition-colors hover:bg-primary/90 animate-appear opacity-0 [animation-delay:500ms]"
-                >
-                <span>{ctaText}</span>
-                <ArrowRight className="h-5 w-5" />
-                </div>
-            </Link>
-            )}
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY })
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
+  return (
+    <section className="relative w-full min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background pt-20 pb-16">
+      {/* Animated Background Effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Mouse follower orb */}
+        <div 
+          className="absolute w-96 h-96 bg-primary rounded-full blur-3xl opacity-20 transition-all duration-300 ease-out"
+          style={{
+            top: mousePosition.y - 192,
+            left: mousePosition.x - 192,
+          }}
+        />
+        
+        {/* Static orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-pink-500 rounded-full blur-3xl opacity-10 animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl opacity-10 animate-pulse" style={{ animationDelay: '1s' }} />
+        
+        {/* Grid pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+      </div>
+
+      {/* Floating Icons */}
+      {floatingIcons.map((item, idx) => (
+        <div
+          key={idx}
+          className={`absolute ${item.position} hidden lg:block opacity-20 hover:opacity-40 transition-opacity animate-float`}
+          style={{ animationDelay: item.delay }}
+        >
+          <item.Icon className={`w-12 h-12 ${item.color}`} />
         </div>
+      ))}
 
-        {mockupImage && (
-          <div className="mt-12 w-full relative animate-appear opacity-0 [animation-delay:700ms]">
-            <MockupFrame>
-              <Mockup type="responsive">
-                <Image
-                  src={mockupImage.src}
-                  alt={mockupImage.alt}
-                  width={mockupImage.width}
-                  height={mockupImage.height}
-                  className="w-full h-auto"
-                  priority
-                />
-              </Mockup>
-            </MockupFrame>
-            <div
-              className="absolute bottom-0 left-0 right-0 w-full h-[303px]"
-              style={{
-                background: "linear-gradient(to top, oklch(from var(--secondary) l c h / 30%) 0%, oklch(from var(--secondary) l c h / 0%) 100%)",
-                zIndex: 10,
-              }}
-            />
+      <div className="container mx-auto max-w-7xl relative z-10 px-6">
+        <div className="flex flex-col items-center text-center space-y-8">
+          {/* Top Badge */}
+          {eyebrow && (
+            <Badge className="bg-primary/10 border-primary/20 text-primary px-6 py-2.5 text-sm font-medium hover:bg-primary/20 transition-all hover:scale-105 cursor-default uppercase tracking-wider">
+              <Rocket className="w-4 h-4 mr-2" />
+              {eyebrow}
+              <Sparkles className="w-4 h-4 ml-2 animate-pulse" />
+            </Badge>
+          )}
+
+          {/* Main Heading */}
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[1.1] max-w-6xl tracking-tight text-center">
+            {title}
+          </h1>
+
+          {/* Subtitle */}
+          {subtitle && (
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-light text-center">
+              {subtitle}
+            </p>
+          )}
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+            <Button 
+              size="lg" 
+              asChild
+              className="group relative bg-gradient-to-r from-primary to-pink-600 hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300 text-lg px-10 py-7 font-bold overflow-hidden"
+            >
+              <Link href={ctaLink}>
+                <span className="relative z-10 flex items-center">
+                  {ctaText}
+                  <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-600 to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
+            </Button>
+            
+            <Button 
+              size="lg" 
+              variant="outline"
+              asChild
+              className="bg-background/50 backdrop-blur-sm border-border hover:bg-accent hover:scale-105 transition-all duration-300 text-lg px-10 py-7 font-semibold"
+            >
+              <Link href="#features">
+                Learn More
+              </Link>
+            </Button>
           </div>
-        )}
-      </section>
-    )
-  }
-)
-Hero.displayName = "Hero"
 
-export { Hero }
+          {/* Trust Indicators */}
+          <div className="flex flex-wrap items-center justify-center gap-8 pt-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span>No credit card required</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-green-400" />
+              <span>Bank-level security</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span>Setup in 2 minutes</span>
+            </div>
+          </div>
+
+          {/* Mockup Image */}
+          {mockupImage && (
+            <div className="mt-16 w-full max-w-6xl mx-auto relative">
+              <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl shadow-primary/20 bg-gradient-to-br from-background/50 to-primary/5 backdrop-blur-sm p-2">
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-background/50">
+                  <Image
+                    src={mockupImage.src}
+                    alt={mockupImage.alt}
+                    width={mockupImage.width}
+                    height={mockupImage.height}
+                    className="w-full h-full object-cover"
+                    priority
+                  />
+                </div>
+              </div>
+              {/* Gradient fade at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+            </div>
+          )}
+
+          {/* Stats Grid */}
+          {!mockupImage && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-16 w-full max-w-5xl mx-auto">
+              {stats.map((stat, idx) => (
+                <Card 
+                  key={idx} 
+                  className="group relative bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-300 hover:-translate-y-2 cursor-default overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <CardContent className="p-6 text-center relative z-10">
+                    <div className="inline-flex p-3 bg-primary/10 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                      <stat.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-pink-500 bg-clip-text text-transparent mb-1">
+                      {stat.value}
+                    </div>
+                    <div className="text-sm text-muted-foreground font-medium">
+                      {stat.label}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 // ============================================================================
 // FILE: components/landing/navbar.tsx
 // ============================================================================
 
-// components/landing/navbar.tsx
 "use client"
 
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Wallet } from "lucide-react"
+import { Menu, Sparkles } from "lucide-react"
 
 const navLinks = [
-  { name: "Features", href: "#features" },
-  { name: "Pricing", href: "#pricing" },
-  { name: "About", href: "#about" },
+  { name: "Fonctionnalités", href: "#features" },
+  { name: "Tarifs", href: "#pricing" },
+  { name: "Contact", href: "#contact" },
 ]
 
 export function Navbar() {
   const [open, setOpen] = React.useState(false)
+  const [isScrolled, setIsScrolled] = React.useState(false)
   const pathname = usePathname()
+
+  React.useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   React.useEffect(() => {
     setOpen(false)
   }, [pathname])
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-screen-2xl items-center">
+    <header className={cn(
+      "sticky top-0 z-50 w-full border-b transition-all duration-300",
+      isScrolled 
+        ? "bg-background/80 backdrop-blur-xl border-border/40 shadow-lg shadow-primary/5" 
+        : "bg-transparent border-transparent"
+    )}>
+      <div className="container flex h-16 max-w-screen-2xl items-center px-6">
         <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Wallet className="h-6 w-6" />
-            <span className="hidden font-bold sm:inline-block">
+          <Link href="/" className="mr-8 flex items-center space-x-2 group">
+            <div className="relative">
+              <Sparkles className="h-7 w-7 text-primary group-hover:text-pink-500 transition-colors duration-300" />
+              <div className="absolute inset-0 bg-primary blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
+            </div>
+            <span className="hidden font-bold text-xl sm:inline-block bg-gradient-to-r from-primary via-pink-500 to-primary bg-clip-text text-transparent">
               Finances Expert Pro
             </span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm">
+          <nav className="flex items-center gap-8 text-sm font-medium">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={cn(
-                  "transition-colors hover:text-foreground/80",
-                  "text-foreground/60"
-                )}
+                className="transition-colors hover:text-primary text-muted-foreground hover:scale-105 transform duration-200"
               >
                 {link.name}
               </Link>
@@ -5133,49 +6171,52 @@ export function Navbar() {
         
         {/* Mobile Nav */}
         <div className="flex items-center md:hidden">
-            <Sheet open={open} onOpenChange={setOpen}>
+          <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-                <Button
+              <Button
                 variant="ghost"
-                className="mr-2 px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                >
-                <Menu className="h-5 w-5" />
+                className="mr-2 px-0 text-base hover:bg-primary/10 focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              >
+                <Menu className="h-6 w-6" />
                 <span className="sr-only">Toggle Menu</span>
-                </Button>
+              </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="pr-0">
-                <Link
+            <SheetContent side="left" className="pr-0 bg-background/95 backdrop-blur-xl">
+              <Link
                 href="/"
-                className="mb-4 flex items-center"
+                className="mb-8 flex items-center space-x-2"
                 onClick={() => setOpen(false)}
-                >
-                <Wallet className="mr-2 h-4 w-4" />
-                <span className="font-bold">Finances Expert Pro</span>
-                </Link>
-                <div className="flex flex-col gap-4">
+              >
+                <Sparkles className="h-6 w-6 text-primary" />
+                <span className="font-bold text-lg">Finances Expert Pro</span>
+              </Link>
+              <div className="flex flex-col gap-6">
                 {navLinks.map((link) => (
-                    <Link
+                  <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="text-muted-foreground"
-                    >
+                    className="text-lg text-muted-foreground hover:text-primary transition-colors"
+                  >
                     {link.name}
-                    </Link>
+                  </Link>
                 ))}
-                </div>
+              </div>
             </SheetContent>
-            </Sheet>
-            <Link href="/" className="flex items-center space-x-2">
-                <Wallet className="h-6 w-6" />
-                <span className="font-bold">Finances Pro</span>
-            </Link>
+          </Sheet>
+          <Link href="/" className="flex items-center space-x-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <span className="font-bold">Finances Pro</span>
+          </Link>
         </div>
         
         <div className="flex flex-1 items-center justify-end space-x-2">
-            <Button asChild>
-                <Link href="/login">Get Started</Link>
-            </Button>
+          <Button 
+            asChild 
+            className="bg-gradient-to-r from-primary to-pink-600 hover:shadow-lg hover:shadow-primary/50 hover:scale-105 transition-all duration-300 font-semibold"
+          >
+            <Link href="/login">Accéder à l'App</Link>
+          </Button>
         </div>
       </div>
     </header>
@@ -5186,46 +6227,201 @@ export function Navbar() {
 // FILE: components/landing/pricing.tsx
 // ============================================================================
 
-// components/landing/pricing.tsx
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { CheckCircle2, Zap, Crown, Sparkles, DollarSign } from "lucide-react"
+
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "0",
+    currency: "$",
+    period: "forever",
+    description: "Perfect for getting started with smart financial management",
+    features: [
+      "Unlimited transaction tracking",
+      "Up to 5 bank accounts",
+      "Basic budgets & categories",
+      "Monthly reports",
+      "Mobile app (iOS & Android)",
+      "Cloud sync",
+      "Charts & statistics",
+    ],
+    cta: "Get Started Free",
+    ctaLink: "/register",
+    popular: false,
+    icon: Sparkles,
+    iconColor: "text-slate-400",
+  },
+  {
+    name: "Premium",
+    price: "19",
+    currency: "$",
+    period: "per month",
+    description: "Unlock the full power of AI-driven financial intelligence",
+    features: [
+      "Everything in Free, plus:",
+      "Unlimited bank accounts",
+      "Advanced AI analysis",
+      "Real-time predictions",
+      "Automatic tax optimization",
+      "Smart alerts & notifications",
+      "24/7 AI financial advisor",
+      "Priority support",
+      "Advanced data export",
+      "Investment simulations",
+      "Developer API access",
+      "Exclusive Premium badge",
+    ],
+    cta: "Go Premium",
+    ctaLink: "/register?plan=premium",
+    popular: true,
+    icon: Crown,
+    iconColor: "text-yellow-400",
+  },
+]
 
 export function Pricing() {
   return (
-    <section id="pricing" className="w-full py-24 sm:py-32">
-        <div className="container">
-            <div className="bg-secondary/30 rounded-lg p-8 md:p-12">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold">Simple, Transparent Pricing</h2>
-                    <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
-                    Start for free and unlock powerful features as you grow. No hidden fees, ever.
-                    </p>
-                </div>
-                <div className="flex justify-center">
-                    <Card className="w-full max-w-sm">
-                        <CardHeader className="text-center">
-                            <CardTitle>Pro Plan</CardTitle>
-                            <CardDescription>All features included.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-center">
-                            <p>
-                                <span className="text-4xl font-bold">$0</span>
-                                <span className="text-muted-foreground">/ month</span>
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-2">This project is for demonstration purposes.</p>
-                        </CardContent>
-                        <CardFooter>
-                            <Button asChild className="w-full">
-                                <Link href="/register">Get Started Now</Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </div>
-            </div>
+    <section id="pricing" className="w-full py-24 sm:py-32 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
+      
+      <div className="container mx-auto max-w-7xl relative z-10 px-6">
+        <div className="text-center mb-20 space-y-6">
+          <div className="flex justify-center">
+            <Badge className="bg-primary/10 border-primary/20 text-primary px-6 py-2.5 text-sm font-medium hover:bg-primary/20 transition-all cursor-default">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Pricing
+            </Badge>
+          </div>
+          
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight text-center mx-auto max-w-4xl">
+            <span className="bg-gradient-to-r from-primary via-pink-500 to-primary bg-clip-text text-transparent">
+              Simple & Transparent
+            </span>
+            <br />
+            <span className="text-foreground mt-2 inline-block">
+              No Hidden Fees
+            </span>
+          </h2>
+          
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed text-center">
+            Start free and upgrade to Premium when you're ready for the full power of AI
+          </p>
         </div>
+
+        <div className="grid md:grid-cols-2 gap-8 lg:gap-12 max-w-6xl mx-auto mb-20">
+          {pricingPlans.map((plan) => (
+            <div 
+              key={plan.name}
+              className={`relative ${plan.popular ? 'md:scale-105 md:-mt-4 md:mb-4' : ''}`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20">
+                  <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 px-8 py-3 text-sm font-bold shadow-2xl shadow-primary/50 animate-pulse">
+                    <Zap className="w-4 h-4 mr-2" />
+                    Most Popular
+                    <Sparkles className="w-4 h-4 ml-2" />
+                  </Badge>
+                </div>
+              )}
+
+              <Card 
+                className={`group relative h-full bg-card/50 backdrop-blur-sm transition-all duration-500 hover:-translate-y-2 overflow-hidden ${
+                  plan.popular 
+                    ? 'border-primary/50 shadow-2xl shadow-primary/20' 
+                    : 'border-border/50 hover:border-primary/30 hover:shadow-xl'
+                }`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${plan.popular ? 'from-purple-600/10 via-pink-600/10 to-red-600/10' : 'from-slate-500/5 to-slate-700/5'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+                <CardHeader className="pb-8 pt-10 relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className={`inline-flex p-4 rounded-2xl ${plan.popular ? 'bg-primary/20' : 'bg-muted'} group-hover:scale-110 transition-transform duration-300`}>
+                      <plan.icon className={`w-8 h-8 ${plan.iconColor}`} />
+                    </div>
+                    {plan.popular && (
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Sparkles key={i} className="w-4 h-4 text-yellow-400 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <CardTitle className="text-3xl font-bold text-foreground mb-2">
+                    {plan.name}
+                  </CardTitle>
+                  <CardDescription className="text-base text-muted-foreground leading-relaxed">
+                    {plan.description}
+                  </CardDescription>
+                  
+                  <div className="flex items-baseline mt-8 mb-2">
+                    <span className={`text-6xl font-black ${plan.popular ? 'bg-gradient-to-r from-primary to-pink-500 bg-clip-text text-transparent' : 'text-foreground'}`}>
+                      {plan.currency}{plan.price}
+                    </span>
+                    <span className="text-muted-foreground ml-3 text-lg font-medium">
+                      / {plan.period}
+                    </span>
+                  </div>
+
+                  {plan.price === "0" && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      No credit card required
+                    </p>
+                  )}
+                </CardHeader>
+
+                <CardContent className="pb-8 relative z-10">
+                  <Button 
+                    asChild
+                    size="lg"
+                    className={`w-full mb-8 font-bold text-base py-6 ${
+                      plan.popular 
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:shadow-primary/50 hover:scale-105' 
+                        : 'bg-muted hover:bg-muted/80'
+                    } transition-all duration-300`}
+                  >
+                    <Link href={plan.ctaLink}>
+                      {plan.cta}
+                      {plan.popular && <Crown className="ml-2 w-5 h-5" />}
+                    </Link>
+                  </Button>
+
+                  <div className="space-y-4">
+                    {plan.features.map((feature, fIdx) => (
+                      <div 
+                        key={fIdx} 
+                        className="flex items-start gap-3"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className={`text-sm leading-relaxed ${feature.includes('Everything') ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+
+                {plan.popular && (
+                  <CardFooter className="bg-primary/5 border-t border-primary/20 py-4 relative z-10">
+                    <p className="text-sm text-center w-full text-muted-foreground">
+                      🎉 <span className="font-semibold text-primary">Special offer:</span> 14-day free trial
+                    </p>
+                  </CardFooter>
+                )}
+              </Card>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
-  );
+  )
 }
 
 // ============================================================================
@@ -5639,13 +6835,12 @@ export async function Header() {
 // FILE: components/layout/sidebar.tsx
 // ============================================================================
 
-// components/layout/sidebar.tsx
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { User } from "next-auth";
+import { signOut } from "next-auth/react";
 import {
   Sidebar as ShadcnSidebar,
   SidebarHeader,
@@ -5654,9 +6849,22 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/global/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/global/ThemeToggle";
 import {
   LayoutDashboard,
   Wallet,
@@ -5666,18 +6874,38 @@ import {
   Settings,
   Home,
   CreditCard,
+  Crown,
+  LogOut,
+  User as UserIcon,
+  CreditCard as BillingIcon,
+  Bell,
+  Sparkles,
+  ChevronsUpDown,
+  Brain, // ← NOUVELLE ICÔNE pour l'IA
 } from "lucide-react";
-import { getInitials } from "@/lib/utils"; 
+import { getInitials, cn } from "@/lib/utils";
+import { useFinanceData } from "@/context/FinanceDataContext";
 
+// Menu items
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: Wallet },
-  { href: "/budgets", label: "Budgets", icon: Landmark },
-  { href: "/goals", label: "Goals", icon: Target },
-  { href: "/investments", label: "Investments", icon: BarChart },
+  { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/transactions", label: "Revenus", icon: Wallet },
+  { href: "/budgets", label: "Dépenses", icon: Landmark },
+  
+  
+  { href: "/goals", label: "Objectifs", icon: Target },
+  { href: "/investments", label: "Investissements", icon: BarChart },
   { href: "/patrimoine", label: "Patrimoine", icon: Home },
-  { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/debts", label: "Dettes", icon: CreditCard },
+  { 
+    href: "/analyse-ia", 
+    label: "Analyse IA", 
+    icon: Brain,
+    badge: "AI",
+    highlight: true // ← Pour un style spécial
+  },
+  { href: "/pass-elite", label: "Pass Elite", icon: Crown },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -5686,45 +6914,192 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const { gameState } = useFinanceData();
+
+  // Calculate level progress
+  const nextLevelXp = gameState ? 100 * Math.pow(1.5, gameState.level - 1) : 100;
+  const progressPercent = gameState ? (gameState.xp / nextLevelXp) * 100 : 0;
 
   return (
-    <ShadcnSidebar>
-      <SidebarHeader>
+    <ShadcnSidebar collapsible="icon">
+      <SidebarHeader className="py-4">
         <Logo />
       </SidebarHeader>
       
-      <SidebarContent className="mt-8">
-        <SidebarMenu className="gap-y-2">
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href}
-                tooltip={item.label}
-              >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+      <SidebarContent className="mt-2">
+        <SidebarMenu className="gap-y-1 px-2">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            const isHighlighted = item.highlight;
+            
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  tooltip={item.label}
+                  className={cn(
+                    "transition-all duration-200 group relative",
+                    isActive && isHighlighted
+                      ? "bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 text-purple-600 dark:text-purple-400 font-medium"
+                      : isActive 
+                      ? "bg-gradient-to-r from-indigo-500/10 to-transparent text-indigo-600 dark:text-indigo-400 font-medium" 
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Link href={item.href} className="flex items-center gap-3">
+                    <item.icon className={cn(
+                      "h-4 w-4 transition-colors", 
+                      isActive && isHighlighted
+                        ? "text-purple-600 dark:text-purple-400"
+                        : isActive 
+                        ? "text-indigo-600 dark:text-indigo-400" 
+                        : "group-hover:text-foreground"
+                    )} />
+                    <span className="flex-1">{item.label}</span>
+                    
+                    {/* Badge pour l'onglet IA */}
+                    {item.badge && (
+                      <Badge 
+                        variant="secondary"
+                        className={cn(
+                          "ml-auto text-[9px] px-1.5 py-0 h-4 font-bold",
+                          isHighlighted && "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0"
+                        )}
+                      >
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+                
+                {/* Glow effect pour l'onglet IA quand actif */}
+                {isActive && isHighlighted && (
+                  <div className="absolute inset-0 -z-10 rounded-md bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20 blur-xl opacity-50" />
+                )}
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter>
-        <div className="flex items-center gap-3 p-2">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={user.image ?? undefined} />
-            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-          </Avatar>
-          <div className="overflow-hidden whitespace-nowrap">
-            <p className="font-medium truncate">{user.name}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {user.email}
-            </p>
-          </div>
-        </div>
+      <SidebarSeparator className="mx-2 opacity-50" />
+
+      <SidebarFooter className="p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <Avatar className="h-8 w-8 rounded-lg border">
+                    <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
+                    <AvatarFallback className="rounded-lg bg-indigo-100 text-indigo-600 font-bold dark:bg-indigo-900 dark:text-indigo-300">
+                      {getInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{user.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                <DropdownMenuLabel className="p-0 font-normal">
+                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                    <Avatar className="h-8 w-8 rounded-lg">
+                      <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
+                      <AvatarFallback className="rounded-lg">{getInitials(user.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold">{user.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                
+                {/* Gamification Status Section */}
+                <div className="px-2 py-2 bg-muted/30 rounded-md mx-1 my-1">
+                    <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                            <div className="bg-amber-100 p-1 rounded-md dark:bg-amber-900/40">
+                                <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground">Niveau {gameState?.level || 1}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{Math.floor(gameState?.xp || 0)} / {Math.floor(nextLevelXp)} XP</span>
+                    </div>
+                    <Progress value={progressPercent} className="h-1.5" />
+                </div>
+
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuGroup>
+                  <DropdownMenuItem asChild>
+                    <Link href="/pass-elite">
+                        <Sparkles className="mr-2 h-4 w-4 text-indigo-500" />
+                        Pass Elite
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/analyse-ia">
+                        <Brain className="mr-2 h-4 w-4 text-purple-500" />
+                        Analyse IA
+                        <Badge className="ml-auto h-4 px-1 text-[9px] bg-gradient-to-r from-purple-600 to-pink-600 border-0">AI</Badge>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                
+                <DropdownMenuSeparator />
+
+                <DropdownMenuGroup>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                        <UserIcon className="mr-2 h-4 w-4" />
+                        Mon Profil
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                        <BillingIcon className="mr-2 h-4 w-4" />
+                        Abonnement
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                        <Bell className="mr-2 h-4 w-4" />
+                        Notifications
+                        <Badge className="ml-auto h-4 px-1 text-[9px] bg-red-500">2</Badge>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Embedded Theme Toggle in Menu */}
+                <div className="flex items-center justify-between px-2 py-1.5">
+                    <span className="text-sm">Thème</span>
+                    <ThemeToggle /> 
+                </div>
+
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="text-red-600 dark:text-red-400 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/20">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Se déconnecter
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </ShadcnSidebar>
   );
@@ -5874,22 +7249,145 @@ export function AssetCard({ asset }: { asset: Asset }) {
 }
 
 // ============================================================================
+// FILE: components/projet/SimulateursTab.tsx
+// ============================================================================
+
+// À ajouter dans SimulateursTab.tsx
+
+import { useRouter } from 'next/navigation'
+
+// ... dans le composant SimulateursTab
+
+const router = useRouter()
+
+// Fonction pour lancer l'analyse IA avec les données de simulation
+const handleAnalyseIA = () => {
+  // Préparer les données de simulation selon l'onglet actif
+  const simulationData: any = {}
+
+  if (activeSim === 'retraite') {
+    const lastData = retraiteResultData[retraiteResultData.length - 1]
+    simulationData.retraite = {
+      ageActuel: retraite.ageActuel,
+      ageRetraite: retraite.ageRetraite,
+      capitalActuel: retraite.capitalActuel,
+      epargneMensuelle: retraite.epargneMensuelle,
+      rendement: retraite.rendement,
+      inflation: retraite.inflation,
+      projectionCapital: lastData.Nominal,
+      projectionReel: lastData.Reel,
+      renteMensuelle: Math.round((lastData.Nominal * 0.04) / 12)
+    }
+  }
+
+  if (activeSim === 'immo') {
+    simulationData.immobilier = {
+      prixBien: immo.prixBien,
+      apport: immo.apport,
+      montantEmprunt: immoCalculs.montantEmprunt,
+      dureeAnnees: immo.dureeAnnees,
+      taux: immo.taux,
+      mensualite: immoCalculs.mensualite,
+      coutInterets: immoCalculs.coutTotalInterets,
+      revenusMensuels: immo.revenusMensuels,
+      tauxEndettement: immoCalculs.tauxEndettement
+    }
+  }
+
+  if (activeSim === 'projet') {
+    const resteAFinancer = Math.max(0, projet.montant - projet.epargneActuelle)
+    simulationData.projet = {
+      nom: projet.nom,
+      montant: projet.montant,
+      delaiMois: projet.delaiMois,
+      epargneActuelle: projet.epargneActuelle,
+      resteAFinancer,
+      profil: projet.profil,
+      mensualiteBrute: projetCalculs.mensualiteBrute,
+      mensualiteOptimisee: projetCalculs.mensualiteOptimisee,
+      gainInterets: projetCalculs.gainInterets
+    }
+  }
+
+  // Stocker les données dans sessionStorage pour les récupérer dans la page d'analyse
+  sessionStorage.setItem('simulationData', JSON.stringify(simulationData))
+  
+  // Rediriger vers l'analyse IA avec paramètre spécial
+  router.push('/analyse-ia?autostart=true&source=simulation')
+}
+
+// BOUTON À AJOUTER dans la section "Action Finale" (après le bouton "Convertir en Objectif")
+
+return (
+  <div className="space-y-8 animate-fadeIn pb-12">
+    {/* ... tout le code existant ... */}
+
+    {/* Action Finale */}
+    <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
+      {activeSim === 'projet' && (
+        <Button 
+          onClick={handleCreerObjectif}
+          className="h-16 px-12 text-lg rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-[1.02] transition-transform shadow-xl shadow-purple-500/20"
+        >
+          <Target className="w-6 h-6 mr-3"/> Convertir en Objectif de Vie
+        </Button>
+      )}
+      
+      {/* NOUVEAU BOUTON IA */}
+      <Button 
+        onClick={handleAnalyseIA}
+        className="h-16 px-12 text-lg rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:scale-[1.02] transition-transform shadow-xl shadow-pink-500/20 relative overflow-hidden group"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <Sparkles className="w-6 h-6 mr-3 relative z-10 animate-pulse"/> 
+        <span className="relative z-10">Analyser avec l'IA</span>
+      </Button>
+    </div>
+
+    {/* Message informatif sous les boutons */}
+    <div className={cn(
+      "text-center text-sm p-4 rounded-xl border",
+      currentTheme.isDark ? "bg-purple-900/20 border-purple-500/30" : "bg-purple-50 border-purple-100"
+    )}>
+      <Brain className="w-5 h-5 inline-block mr-2 text-purple-500" />
+      <span className="text-purple-700 dark:text-purple-300">
+        L'IA analysera vos projections et vous proposera des optimisations personnalisées (+50 XP)
+      </span>
+    </div>
+  </div>
+)
+
+// ============================================================================
 // FILE: components/providers.tsx
 // ============================================================================
 
-// components/providers.tsx
 "use client";
 
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { type ThemeProviderProps } from "next-themes";
 import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "@/context/useTheme";
+// We import the CUSTOM theme provider as 'AppThemeProvider' to avoid conflict, 
+// if you plan to use the custom color schemes (Ocean, Cyberpunk) later.
+import { ThemeProvider as AppThemeProvider } from "@/context/ThemeContext";
+import { FinanceDataProvider } from "@/context/FinanceDataContext";
 
 export function Providers({ children, ...props }: ThemeProviderProps) {
   return (
     <SessionProvider>
-      <ThemeProvider {...props}>{children}</ThemeProvider>
+      {/* 1. NextThemes handles Light/Dark mode via CSS class */}
+      <NextThemesProvider
+        attribute="class" 
+        defaultTheme="system" 
+        enableSystem
+        disableTransitionOnChange
+        {...props}
+      >
+        {/* 2. AppTheme handles custom color palettes (Cyberpunk, etc.) */}
+        <AppThemeProvider>
+            {children}
+        </AppThemeProvider>
+      </NextThemesProvider>
     </SessionProvider>
   );
 }
@@ -13563,8 +15061,32 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import type { Depense, Revenu, Objectif, Actif, Trophee, Budget, GameState, Investment } from '@/types';
 import { calculerMontantMensuel } from '@/utils/financeCalculations';
 import { DEFAULT_QUESTS } from '@/constants/index';
+// Import the Server Action
+import { generateFinancialInsights } from '@/lib/actions/ai.actions';
 
 type StrategieDette = 'avalanche' | 'boule de neige';
+
+// Define the shape of the AI response here (or import from types if centralized)
+export interface DeepInsightsData {
+  financialScore: number;
+  financialPersona: string;
+  executiveSummary: string;
+  keyTrends: {
+    title: string;
+    direction: 'up' | 'down' | 'flat';
+    insight: string;
+  }[];
+  actionableSteps: {
+    action: string;
+    impact: string;
+    difficulty: 'High' | 'Medium' | 'Low';
+  }[];
+  forecast: {
+    nextMonthSavings: number;
+    debtFreeProjection: string;
+    wealthProjection6Months: number;
+  };
+}
 
 interface FinanceDataContextType {
   cashFlow: number;
@@ -13581,8 +15103,11 @@ interface FinanceDataContextType {
   actifs: Actif[];
   setActifs: React.Dispatch<React.SetStateAction<Actif[]>>;
   tropheesDeverrouilles: Trophee[];
-  analyserAvecIA: () => void;
+  // AI Logic
+  analyserAvecIA: () => Promise<void>;
   chargementIA: boolean;
+  aiInsights: DeepInsightsData | null; // Added to store the result
+  
   budgets: Budget[];
   setBudgets: React.Dispatch<React.SetStateAction<Budget[]>>;
   gameState: GameState;
@@ -13614,7 +15139,11 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const [objectifs, setObjectifs] = useState<Objectif[]>([]);
   const [actifs, setActifs] = useState<Actif[]>([]);
   const [investissements, setInvestissements] = useState<Investment[]>([]);
+  
+  // AI State
   const [chargementIA, setChargementIA] = useState(false);
+  const [aiInsights, setAiInsights] = useState<DeepInsightsData | null>(null);
+
   const [strategieDette, setStrategieDette] = useState<StrategieDette>('avalanche');
   const [gameState, setGameState] = useState<GameState>(initialGameState);
 
@@ -13694,6 +15223,26 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const scoreSante = Math.min(100, Math.max(0, Math.round((cashFlow / (totalRevenusMensuel || 1)) * 100 + 50)));
   const patrimoineNet = totalActifs + totalInvestissements - totalDettes;
 
+  // --- Real AI Integration ---
+  const analyserAvecIA = async () => {
+    setChargementIA(true);
+    try {
+      // Calls the Server Action defined in lib/actions/ai.actions.ts
+      const result = await generateFinancialInsights();
+      
+      if (result.error) {
+        console.error("AI Analysis Failed:", result.error);
+        // You could also add a toast notification here if you import useToast
+      } else {
+        setAiInsights(result as DeepInsightsData);
+      }
+    } catch (error) {
+      console.error("Unexpected error during AI analysis:", error);
+    } finally {
+      setChargementIA(false);
+    }
+  };
+
   const value: FinanceDataContextType = {
     cashFlow,
     scoreSante,
@@ -13709,11 +15258,9 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
     actifs,
     setActifs,
     tropheesDeverrouilles: [],
-    analyserAvecIA: () => {
-      setChargementIA(true);
-      setTimeout(() => setChargementIA(false), 2000);
-    },
+    analyserAvecIA,
     chargementIA,
+    aiInsights, // Expose the data
     budgets,
     setBudgets,
     gameState,
@@ -14083,24 +15630,50 @@ export async function generateFinancialInsights() {
   const userId = session.user.id;
 
   try {
+    // 1. Fetch Data (Optimized: only grab what is needed)
     const [transactions, goals, budgets, assets, debts] = await Promise.all([
-      prisma.transaction.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 100 }),
-      prisma.goal.findMany({ where: { userId } }),
+      prisma.transaction.findMany({ 
+        where: { userId }, 
+        orderBy: { date: 'desc' }, 
+        take: 100,
+        select: { date: true, amount: true, category: true, type: true, name: true } 
+      }),
+      prisma.goal.findMany({ where: { userId }, select: { name: true, targetAmount: true, currentAmount: true } }),
       prisma.budget.findMany({ where: { userId } }),
       prisma.asset.findMany({ where: { userId } }),
       prisma.debt.findMany({ where: { userId } })
     ]);
 
+    // 2. Pre-calculate Summary Stats to help the AI (Reduces hallucination risk)
+    const totalIncome = transactions
+        .filter(t => t.type === 'INCOME')
+        .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = transactions
+        .filter(t => t.type === 'EXPENSE')
+        .reduce((sum, t) => sum + t.amount, 0);
+
     const financialData = {
-      transactions: transactions.map(t => ({...t, date: format(t.date, 'yyyy-MM-dd')})),
+      summaryStats: {
+        totalIncome,
+        totalExpenses,
+        netCashFlow: totalIncome - totalExpenses,
+        transactionCount: transactions.length
+      },
+      recentTransactions: transactions.map(t => ({
+        ...t, 
+        date: format(t.date, 'yyyy-MM-dd')
+      })),
       goals,
       budgets,
       assets,
       debts
     };
 
+    // 3. Call AI
     const analysisResult = await runFinancialAnalysis(financialData);
     
+    // 4. Parse & Return
     // The Gemini function returns a JSON string, so we parse it.
     const parsedResult = JSON.parse(analysisResult);
     
@@ -14819,37 +16392,46 @@ if (!process.env.GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use a cheaper/faster model for basic JSON tasks
+// Use a model capable of good reasoning (Flash is fast and cost-effective for this)
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash-lite",
-    // Force JSON mode where supported, but we still clean the output manually below to be safe
+    model: "gemini-2.0-flash", 
     generationConfig: { responseMimeType: "application/json" }
 });
 
-// Helper to strip Markdown code blocks
+// Helper to strip Markdown code blocks if the model adds them
 function cleanJsonOutput(text: string) {
-  // Remove ```json and ``` wrapping
-  const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
-  return cleaned;
+  return text.replace(/```json/g, "").replace(/```/g, "").trim();
 }
 
 export async function runFinancialAnalysis(financialData: any) {
   const prompt = `
-    You are an expert financial analyst. Analyze the following financial data for a user and provide a concise, insightful report.
+    You are an elite financial strategist. Analyze the provided user data (transactions, goals, assets, debts).
+    
+    Data Context:
+    - Transactions: Last 100 entries. Look for recurring patterns, impulse buys, and category bloat.
+    - Debts vs Assets: Analyze net worth trends and liquidity.
+    - Summary Stats: Use the pre-calculated totals for accuracy.
+    
+    Perform a deep analysis and return a strict JSON object with this exact structure:
+    {
+      "financialScore": <number 0-100>,
+      "financialPersona": "<string (e.g., 'Aggressive Saver', 'Impulsive Spender', 'Balanced Planner', 'Debt Juggler')>",
+      "executiveSummary": "<string (2 sentences max, punchy and direct)>",
+      "keyTrends": [
+        { "title": "<string>", "direction": "<'up' | 'down' | 'flat'>", "insight": "<string>" }
+      ],
+      "actionableSteps": [
+        { "action": "<string>", "impact": "<string (e.g., 'Save $200/mo')>", "difficulty": "<'High' | 'Medium' | 'Low'>" }
+      ],
+      "forecast": {
+        "nextMonthSavings": <number (estimated savings for next month)>,
+        "debtFreeProjection": "<string (e.g., '14 months', 'N/A' if no debt, or 'Unknown')>",
+        "wealthProjection6Months": <number (estimated total net worth in 6 months)>
+      }
+    }
 
     Financial Data:
     ${JSON.stringify(financialData, null, 2)}
-
-    Your task is to return a JSON object with the exact following structure:
-    {
-      "score": <number 0-100>,
-      "summary": "<string>",
-      "strengths": ["<string>", "<string>"],
-      "weaknesses": ["<string>", "<string>"],
-      "recommendations": ["<string>", "<string>", "<string>"]
-    }
-
-    Do not include any introductory text. Just return the JSON string.
   `;
 
   const result = await model.generateContent(prompt);
@@ -15069,6 +16651,7 @@ export default config;
 
 // prisma.config.ts
 
+import "dotenv/config"; // ⬅️ OBLIGATOIRE
 import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
@@ -15078,9 +16661,10 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"), // This tells Prisma how to get the URL
+    url: env("DATABASE_URL"),
   },
 });
+
 
 // ============================================================================
 // FILE: prisma/schema.prisma
@@ -15516,6 +17100,80 @@ export interface Theme {
 
 
 // ============================================================================
+// FILE: types/analyse.ts
+// ============================================================================
+
+// types/analyse.ts
+
+export interface Recommandation {
+  priorite: number;
+  titre: string;
+  description: string;
+  economie: string;
+  delai: string;
+}
+
+export interface AnalyseIA {
+  score: number;
+  resume: string;
+  pointsForts: string[];
+  pointsFaibles: string[];
+  recommandationsPrioritaires: Recommandation[];
+  conseilsExpert: string[];
+  optimisationFiscale: string;
+  dateAnalyse?: Date;
+}
+
+// Exemple de données pour tester
+export const mockAnalyseIA: AnalyseIA = {
+  score: 72,
+  resume: "Votre situation financière est globalement saine avec des opportunités d'amélioration significatives.",
+  pointsForts: [
+    "Épargne régulière et constante chaque mois",
+    "Diversification correcte de vos investissements",
+    "Absence de dettes à taux élevé",
+    "Fonds d'urgence constitué pour 6 mois de dépenses"
+  ],
+  pointsFaibles: [
+    "Dépenses de loisirs supérieures de 30% à la moyenne recommandée",
+    "Optimisation fiscale non exploitée (PER, défiscalisation)",
+    "Taux d'épargne inférieur à l'objectif de 20%",
+    "Frais bancaires élevés (3 comptes non nécessaires)"
+  ],
+  recommandationsPrioritaires: [
+    {
+      priorite: 1,
+      titre: "Réduire les frais bancaires",
+      description: "Consolidez vos comptes bancaires et optez pour une banque en ligne. Vous payez actuellement 15€/mois en frais inutiles.",
+      economie: "180€/an",
+      delai: "Immédiat"
+    },
+    {
+      priorite: 2,
+      titre: "Ouvrir un PER (Plan Épargne Retraite)",
+      description: "Profitez de la déduction fiscale jusqu'à 10% de vos revenus. Avec votre TMI à 30%, c'est 900€ d'économies d'impôts potentielles.",
+      economie: "900€/an",
+      delai: "1 mois"
+    },
+    {
+      priorite: 3,
+      titre: "Optimiser le budget loisirs",
+      description: "Réduisez de 20% vos dépenses de loisirs (actuellement 450€/mois) en privilégiant les activités gratuites ou à prix réduit.",
+      economie: "1,080€/an",
+      delai: "3 mois"
+    }
+  ],
+  conseilsExpert: [
+    "Automatisez vos virements d'épargne le jour de la réception du salaire",
+    "Négociez vos contrats d'assurance auto et habitation (économie moyenne: 200€/an)",
+    "Constituez un portefeuille d'ETF diversifié pour votre épargne long terme",
+    "Utilisez la règle 50/30/20: 50% besoins, 30% envies, 20% épargne",
+    "Revoyez vos abonnements mensuels et résiliez ceux non utilisés"
+  ],
+  optimisationFiscale: "Avec votre profil, vous pouvez optimiser jusqu'à 1,500€ d'impôts par an via: PER (900€), dons aux associations (300€), investissement FCPI/FIP (200€), et services à la personne (100€). Total économies potentielles: 1,500€/an soit 125€/mois."
+};
+
+// ============================================================================
 // FILE: types/index.ts
 // ============================================================================
 
@@ -15680,6 +17338,6 @@ export function calculerMontantMensuel(item: Depense | Revenu): number {
 // ============================================================================
 // END OF CONTEXT
 // ============================================================================
-// Total files included: 140
-// Generated: Mon Jan  5 23:21:08 CET 2026
+// Total files included: 145
+// Generated: Wed Jan  7 11:22:46 CET 2026
 // ============================================================================
