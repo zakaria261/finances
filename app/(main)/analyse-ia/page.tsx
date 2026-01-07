@@ -112,6 +112,8 @@ export default function AnalyseIAPage() {
         body: JSON.stringify(financialSnapshot)
       })
 
+      alert(JSON.stringify(financialSnapshot, null, 2)) // DEBUG
+
       if (!response.ok) {
         throw new Error('Erreur lors de l\'analyse')
       }

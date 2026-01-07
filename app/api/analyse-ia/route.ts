@@ -196,7 +196,7 @@ Fournis une analyse complète et des recommandations actionnables selon le sché
 
     // Appeler Gemini avec structured output
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
@@ -208,6 +208,8 @@ Fournis une analyse complète et des recommandations actionnables selon le sché
       { text: systemPrompt },
       { text: userPrompt }
     ])
+
+    console.log('Gemini response:', result)
 
     const response = result.response
     const text = response.text()
