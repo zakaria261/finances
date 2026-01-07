@@ -1,3 +1,7 @@
+// ============================================================================
+// FILE: types/index.ts
+// ============================================================================
+
 import { LucideIcon } from 'lucide-react';
 
 export type RevenuFrequence = 'mensuel' | 'ponctuel' | 'annuel';
@@ -29,7 +33,8 @@ export interface Revenu {
 }
 
 export interface Objectif {
-  id: number;
+  // Changed to string | number to support both legacy mocks and real MongoDB IDs
+  id: string | number; 
   nom: string;
   montantCible: string;
   montantActuel: string;
@@ -51,6 +56,7 @@ export interface Trophee {
   id: string;
   nom: string;
   description: string;
+  condition: (data: FinancialData) => boolean;
 }
 
 export interface Reward {
@@ -97,4 +103,22 @@ export interface Investment {
   quantity: number;
   averageBuyPrice: number;
   currentPrice: number;
+}
+
+// ... existing FinancialData interface ...
+export interface FinancialData {
+  depenses: Depense[];
+  revenus: Revenu[];
+  objectifs: Objectif[];
+  actifs: Actif[];
+  investissements: Investment[];
+  cashFlow: number;
+  score: number;
+  optimisationDettes: boolean;
+  patrimoineNet: number;
+  infosFiscales: any;
+  budgets: Budget[];
+  analyseIAEffectuee: boolean;
+  notifications: any[];
+  gameState: GameState;
 }

@@ -1,4 +1,3 @@
-// components/goals/add-goal-dialog.tsx (NEW FILE)
 "use client";
 
 import { useState } from "react";
@@ -28,8 +27,15 @@ const formSchema = z.object({
 export function AddGoalDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    // FIX: Explicitly set default values to prevent "uncontrolled to controlled" error
+    defaultValues: {
+      name: "",
+      targetAmount: 0, 
+      deadline: undefined, 
+    },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -55,14 +61,25 @@ export function AddGoalDialog() {
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Goal Name</FormLabel>
-                <FormControl><Input placeholder="e.g., Vacation Fund" {...field} /></FormControl>
+                <FormControl>
+                  <Input placeholder="e.g., Vacation Fund" {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name="targetAmount" render={({ field }) => (
               <FormItem>
                 <FormLabel>Target Amount</FormLabel>
-                <FormControl><Input type="number" placeholder="5000.00" {...field} /></FormControl>
+                <FormControl>
+                  {/* FIX: Ensure field.value is handled if undefined (though defaultValues should catch it) */}
+                  <Input 
+                    type="number" 
+                    placeholder="5000.00" 
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                    value={field.value || ''}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -79,7 +96,13 @@ export function AddGoalDialog() {
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      <Calendar 
+                        mode="single" 
+                        selected={field.value} 
+                        onSelect={field.onChange} 
+                        initialFocus 
+                        disabled={(date) => date < new Date()}
+                      />
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
