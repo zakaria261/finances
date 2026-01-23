@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai'
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 // Response schema for structured output
-const responseSchema = {
+const responseSchema: Schema = {
   type: SchemaType.OBJECT,
   properties: {
     score: {
