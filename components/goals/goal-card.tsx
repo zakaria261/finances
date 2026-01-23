@@ -5,7 +5,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { Goal } from "@prisma/client";
+type Goal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline: Date | null;
+  createdAt: Date;
+};
 import { format } from "date-fns";
 import {
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle
