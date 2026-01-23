@@ -9,13 +9,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Trash } from "lucide-react";
 
-// ❌ NE PLUS importer depuis @prisma/client
-// import type { Investment } from "@prisma/client";
-
-// ✅ Typage safe depuis Prisma
-import type { Prisma } from "@prisma/client";
-
-type Investment = Prisma.InvestmentGetPayload<{}>;
+// ✅ Type LOCAL (aucune dépendance Prisma côté client)
+type Investment = {
+  id: string;
+  name: string;
+  ticker: string;
+  quantity: number;
+  purchasePrice: number;
+};
 
 export function InvestmentsTable({
   investments,
