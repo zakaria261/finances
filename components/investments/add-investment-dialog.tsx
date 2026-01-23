@@ -31,16 +31,24 @@ import { useToast } from "@/components/ui/use-toast";
 import { createInvestment } from "@/lib/actions/investment.actions";
 
 // -----------------------------------------------------------------------------
-// Zod schema
+// Zod schema (Zod v4 compatible)
 // -----------------------------------------------------------------------------
 const formSchema = z.object({
   name: z.string().min(1, "Name is required."),
   ticker: z.string().min(1, "Ticker is required."),
+
   quantity: z.coerce
-    .number({ invalid_type_error: "Quantity must be a number" })
+    .number()
+    .refine((val) => !isNaN(val), {
+      message: "Quantity must be a number",
+    })
     .positive("Quantity must be positive."),
+
   purchasePrice: z.coerce
-    .number({ invalid_type_error: "Price must be a number" })
+    .number()
+    .refine((val) => !isNaN(val), {
+      message: "Price must be a number",
+    })
     .positive("Price must be positive."),
 });
 
