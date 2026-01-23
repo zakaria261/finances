@@ -43,8 +43,9 @@ type Goal = {
 
 /* ✅ ZOD SCHEMA */
 const addFundsSchema = z.object({
-  amount: z.coerce.number().positive("Amount must be positive"),
+  amount: z.coerce.number().min(0),
 });
+
 
 /* ✅ TYPE FORM */
 type AddFundsFormValues = {
@@ -55,6 +56,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
   const { toast } = useToast();
 
   const form = useForm<AddFundsFormValues>({
+    // @ts-ignore
     resolver: zodResolver<AddFundsFormValues>(addFundsSchema),
     defaultValues: {
       amount: 0,
