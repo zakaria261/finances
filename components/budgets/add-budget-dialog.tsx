@@ -70,8 +70,15 @@ export function AddBudgetDialog() {
             <FormField control={form.control} name="limit" render={({ field }) => (
               <FormItem>
                 <FormLabel>Monthly Limit</FormLabel>
-                <FormControl><Input type="number" placeholder="500.00" {...field} /></FormControl>
-                <FormMessage />
+                <FormControl>
+                <Input
+                  type="number"
+                  placeholder="500.00"
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
               </FormItem>
             )} />
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
