@@ -42,7 +42,7 @@ import { createAsset } from "@/lib/actions/patrimoine.actions";
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   value: z.coerce
-    .number({ invalid_type_error: "Value must be a number" })
+    .number()
     .positive("Value must be positive"),
   type: z.enum(["SAVINGS", "REAL_ESTATE", "OTHER"]),
 });
@@ -57,7 +57,7 @@ export function AddAssetDialog() {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       name: "",
       value: 0,
